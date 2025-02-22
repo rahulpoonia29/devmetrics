@@ -1,112 +1,55 @@
-import { join } from "path";
-// import * as sqlite3 from "sqlite3";
-import { promisify } from "util";
-import { ChangeInterval } from "../types/Metrics";
+// metricsStorage.ts
+import * as fs from "fs/promises";
+import * as path from "path";
+import { Metric } from "../types/Metrics";
 
 export class MetricsStorage {
-    // private db: sqlite3.Database;
-    // private runAsync: (sql: string, params?: any[]) => Promise<void>;
-    // private allAsync: (sql: string, params?: any[]) => Promise<any[]>;
+    private readonly storageFolderPath: string;
 
-    constructor(storagePath: string) {
-        // this.db = new sqlite3.Database(join(storagePath, "metrics.db"));
-        // Promisify database methods
-        // this.runAsync = promisify(this.db.run.bind(this.db));
-        // this.allAsync = promisify(this.db.all.bind(this.db));
+    constructor(storageFolderPath: string, projectName: string) {
+        this.storageFolderPath = path.join(storageFolderPath, projectName);
+        fs.mkdir(this.storageFolderPath, { recursive: true }).catch(
+            console.error
+        ); // Ensure directory exists
     }
 
-    async initialize(): Promise<void> {
+    public async storeMetric(metric: Metric): Promise<void> {
+        const timestamp = new Date(metric.endTime)
+            .toISOString()
+            .replace(/:/g, "-");
+        const filename = `${timestamp}.json`;
+        const filePath = path.join(this.storageFolderPath, filename);
+        await fs.writeFile(filePath, JSON.stringify(metric, null, 2));
+    }
+
+    public async getMetrics(): Promise<Metric[]> {
         try {
-            // await this.runAsync(`
-            //     CREATE TABLE IF NOT EXISTS change_intervals (
-            //         id INTEGER PRIMARY KEY AUTOINCREMENT,
-            //         startTime INTEGER NOT NULL,
-            //         endTime INTEGER NOT NULL,
-            //         summary TEXT NOT NULL,
-            //         filesChanged INTEGER NOT NULL,
-            //         totalAdditions INTEGER NOT NULL,
-            //         totalDeletions INTEGER NOT NULL
-            //     )
-            // `);
+            const files = await fs.readdir(this.storageFolderPath);
+            const metrics: Metric[] = [];
+            for (const file of files) {
+                if (file.endsWith(".json")) {
+                    const filePath = path.join(this.storageFolderPath, file);
+                    const fileContent = await fs.readFile(filePath, "utf-8");
+                    metrics.push(JSON.parse(fileContent));
+                }
+            }
+            return metrics.sort((a, b) => a.endTime - b.endTime); // Sort by timestamp
         } catch (error) {
-            console.error("Failed to initialize database:", error);
-            throw error;
-        }
-    }
-
-    async storeMetric(metric: ChangeInterval): Promise<void> {
-        try {
-            // await this.runAsync(
-            //     `INSERT INTO file_changes
-            //     (startTime, endTime, summary, filesChanged, totalAdditions, totalDeletions)
-            //     VALUES (?, ?, ?, ?, ?, ?)`,
-            //     [
-            //         metric.startTime,
-            //         metric.endTime,
-            //         metric.summary,
-            //         metric.filesChanged,
-            //         metric.totalAdditions,
-            //         metric.totalDeletions,
-            //     ]
-            // );
-        } catch (error) {
-            console.error("Failed to store metric:", error);
-            throw error;
-        }
-    }
-
-    async getMetrics(): Promise<ChangeInterval[]> {
-        try {
-            // return await this.allAsync("SELECT * FROM file_changes");
             return [];
-        } catch (error) {
-            console.error("Failed to get metrics:", error);
-            throw error;
         }
     }
 
-    async close(): Promise<void> {
+    public async clearMetrics(): Promise<void> {
         try {
-            // await promisify(this.db.close.bind(this.db))();
+            const files = await fs.readdir(this.storageFolderPath);
+            for (const file of files) {
+                if (file.endsWith(".json")) {
+                    const filePath = path.join(this.storageFolderPath, file);
+                    await fs.unlink(filePath);
+                }
+            }
         } catch (error) {
-            console.error("Failed to close database:", error);
-            throw error;
+            console.error("Error clearing metrics:", error);
         }
     }
 }
-
-// async storeInterval(interval: ChangeInterval): Promise<void> {
-//     try {
-//         await this.runAsync(
-//             `INSERT INTO change_intervals
-//             (startTime, endTime, summary, filesChanged, totalAdditions, totalDeletions)
-//             VALUES (?, ?, ?, ?, ?, ?)`,
-//             [
-//                 interval.startTime,
-//                 interval.endTime,
-//                 interval.summary,
-//                 JSON.stringify(interval.filesChanged),
-//                 interval.totalAdditions,
-//                 interval.totalDeletions,
-//             ]
-//         );
-//     } catch (error) {
-//         console.error("Failed to store interval:", error);
-//         throw error;
-//     }
-// }
-
-// async getIntervals(): Promise<ChangeInterval[]> {
-//     try {
-//         const rows = await this.allAsync(
-//             "SELECT * FROM change_intervals ORDER BY startTime DESC"
-//         );
-//         return rows.map((row) => ({
-//             ...row,
-//             filesChanged: JSON.parse(row.filesChanged),
-//         }));
-//     } catch (error) {
-//         console.error("Failed to get intervals:", error);
-//         throw error;
-//     }
-// }
