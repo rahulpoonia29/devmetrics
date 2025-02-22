@@ -1,9 +1,8 @@
-export interface ChangeInterval {
+import { DiffData } from "../lib/GitSnapshotManager";
+
+export interface Metric extends DiffData {
     id?: number;
+    diffSummaryMessage: string;
     startTime: number;
     endTime: number;
-    summary: string;
-    filesChanged: number;
-    totalAdditions: number;
-    totalDeletions: number;
 }

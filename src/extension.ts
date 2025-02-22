@@ -1,12 +1,11 @@
+import * as crypto from "crypto";
 import * as vscode from "vscode";
 import { MetricsStorage } from "./lib/MetricsStorage";
 import { ProjectDiffAnalyzer } from "./lib/ProjectDiffAnalyzer";
+import { Metric } from "./types/Metrics";
 
 export async function activate(context: vscode.ExtensionContext) {
-    // const metricsStorage = new MetricsStorage(context.globalStorageUri.fsPath);
-    // await metricsStorage.initialize();
-
-    // let diffAnalyzer: ProjectDiffAnalyzer | null = null;
+    let diffAnalyzer: ProjectDiffAnalyzer | null = null;
 
     console.log('Congratulations, your extension "devmetrics" is now active!');
 
@@ -48,6 +47,8 @@ export async function activate(context: vscode.ExtensionContext) {
             const projectFolderPath = (await vscode.workspace
                 .getConfiguration()
                 .get("devmetrics.projectFolderPath")) as string;
+            console.log(projectFolderPath);
+
             if (!projectFolderPath) {
                 await vscode.window.showErrorMessage(
                     "No folder selected. Please select a folder to track metrics."
@@ -55,13 +56,12 @@ export async function activate(context: vscode.ExtensionContext) {
                 await vscode.commands.executeCommand("devmetrics.selectFolder");
                 return;
             }
-            const diffAnalyzer = new ProjectDiffAnalyzer(
+
+            diffAnalyzer = new ProjectDiffAnalyzer(
                 projectFolderPath,
-                // metricsStorage,
-                null,
                 context.globalStorageUri.fsPath
             );
-            // await diffAnalyzer.init();
+            await diffAnalyzer.init();
 
             await vscode.workspace
                 .getConfiguration()
@@ -71,52 +71,77 @@ export async function activate(context: vscode.ExtensionContext) {
                     vscode.ConfigurationTarget.Global
                 );
             vscode.window.showInformationMessage(
-                "Tracking enabled using git snapshot diff method"
+                "Tracking enabled using git snapshot metric method"
             );
         }
     );
 
-    // const showMetricsDisposable = vscode.commands.registerCommand(
-    //     "devmetrics.showMetrics",
-    //     async () => {
-    //         await vscode.window.showInformationMessage(
-    //             "Metrics not implemented"
-    //         );
-    //         // const metricsStorage = new MetricsStorage(
-    //         //     context.globalStorageUri.fsPath
-    //         // );
-    //         // await metricsStorage.initialize();
-    //         // if (metricsStorage) {
-    //         //     const metrics = await metricsStorage.getMetrics();
-    //         //     if (metrics.length === 0) {
-    //         //         await vscode.window.showInformationMessage(
-    //         //             "No metrics to show."
-    //         //         );
-    //         //         return;
-    //         //     }
-    //         //     const metricsText = metrics[0].summary;
-    //         //     await vscode.window.showInformationMessage(metricsText);
-    //         // } else {
-    //         //     await vscode.window.showErrorMessage(
-    //         //         "Metrics storage not initialized. Tracking may not be enabled."
-    //         //     );
-    //         // }
-    //     }
-    // );
+    const showMetricsDisposable = vscode.commands.registerCommand(
+        "devmetrics.showMetrics",
+        async () => {
+            const projectFolderPath = vscode.workspace
+                .getConfiguration()
+                .get("devmetrics.projectFolderPath") as string;
+            if (!projectFolderPath) {
+                vscode.window.showErrorMessage(
+                    "Please select a project folder first."
+                );
+                return;
+            }
+
+            const sanitizedProjectFolderName = crypto
+                .createHash("md5")
+                .update(projectFolderPath)
+                .digest("hex");
+
+            const metricsStorage = new MetricsStorage(
+                context.globalStorageUri.fsPath,
+                sanitizedProjectFolderName
+            );
+            const metrics = await metricsStorage.getMetrics();
+
+            if (metrics.length === 0) {
+                vscode.window.showInformationMessage("No metrics available.");
+                return;
+            }
+
+            // Basic UI: Show metrics in a QuickPick
+            const quickPickItems = metrics.map((metric: Metric) => ({
+                label: `${metric.summary.filesChanged} files changed with ${metric.summary.insertions}+++ ${metric.summary.deletions}---`,
+                // detail: metric.summary,
+                // description: new Date(metric.endTime).toLocaleString(),
+                metric: metric, // Store the metric object
+            }));
+
+            vscode.window
+                .showQuickPick(quickPickItems, {
+                    placeHolder: "Select a metric to view details",
+                    canPickMany: false,
+                })
+                .then((selectedItem) => {
+                    if (selectedItem) {
+                        vscode.window.showInformationMessage(
+                            `Details: ${JSON.stringify(
+                                selectedItem.metric.diffSummaryMessage,
+                                null,
+                                2
+                            )}`
+                        );
+                    }
+                });
+        }
+    );
 
     context.subscriptions.push(
         selectFolderDisposable,
         enableTrackingDisposable,
-        // showMetricsDisposable,
+        showMetricsDisposable,
         {
             dispose: async () => {
-                // if (diffAnalyzer) {
-                //     await diffAnalyzer.dispose();
-                // }
-                // await metricsStorage.close();
+                if (diffAnalyzer) {
+                    await diffAnalyzer.dispose();
+                }
             },
         }
     );
 }
-
-// export function deactivate() {}
