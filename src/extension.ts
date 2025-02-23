@@ -5,7 +5,7 @@ import { CodeChangeTracker } from './lib/CodeChangeTracker'
 import { CodeChangeMetrics } from './types/Metrics'
 
 export async function activate(context: vscode.ExtensionContext) {
-    let diffAnalyzer: CodeChangeTracker | null = null
+    let codeChangeTracker: CodeChangeTracker | null = null
 
     const selectFolderDisposable = vscode.commands.registerCommand(
         'devmetrics.selectFolder',
@@ -54,11 +54,11 @@ export async function activate(context: vscode.ExtensionContext) {
                 return
             }
 
-            diffAnalyzer = new CodeChangeTracker(
+            codeChangeTracker = new CodeChangeTracker(
                 projectFolderPath,
                 context.globalStorageUri.fsPath
             )
-            await diffAnalyzer.startTracking()
+            await codeChangeTracker.startTracking()
 
             await vscode.workspace
                 .getConfiguration()
@@ -70,6 +70,37 @@ export async function activate(context: vscode.ExtensionContext) {
             vscode.window.showInformationMessage(
                 'Tracking enabled using git snapshot metric method'
             )
+        }
+    )
+
+    const disableTrackingDisposable = vscode.commands.registerCommand(
+        'devmetrics.stopTracking',
+        async () => {
+            const isTrackingEnabled = vscode.workspace
+                .getConfiguration()
+                .get(
+                    'devmetrics.trackingEnabled',
+                    vscode.ConfigurationTarget.Global
+                )
+
+            if (!isTrackingEnabled) {
+                vscode.window.showInformationMessage(
+                    'Tracking is not currently enabled.'
+                )
+                return
+            }
+
+            await vscode.workspace
+                .getConfiguration()
+                .update(
+                    'devmetrics.trackingEnabled',
+                    false,
+                    vscode.ConfigurationTarget.Global
+                )
+
+            if (codeChangeTracker) {
+                await codeChangeTracker.stopTracking()
+            }
         }
     )
 
@@ -131,11 +162,12 @@ export async function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         selectFolderDisposable,
         enableTrackingDisposable,
+        disableTrackingDisposable,
         showMetricsDisposable,
         {
             dispose: async () => {
-                if (diffAnalyzer) {
-                    await diffAnalyzer.stopTracking()
+                if (codeChangeTracker) {
+                    await codeChangeTracker.stopTracking()
                 }
             },
         }
