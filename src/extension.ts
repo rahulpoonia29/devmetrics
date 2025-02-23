@@ -1,11 +1,11 @@
 import * as crypto from 'crypto'
 import * as vscode from 'vscode'
-import { MetricsStorage } from './lib/MetricsStorage'
-import { ProjectDiffAnalyzer } from './lib/ProjectDiffAnalyzer'
-import { Metric } from './types/Metrics'
+import { ProjectMetricsDatabase } from './lib/MetricsDB'
+import { CodeChangeTracker } from './lib/CodeChangeTracker'
+import { CodeChangeMetrics } from './types/Metrics'
 
 export async function activate(context: vscode.ExtensionContext) {
-    let diffAnalyzer: ProjectDiffAnalyzer | null = null
+    let diffAnalyzer: CodeChangeTracker | null = null
 
     const selectFolderDisposable = vscode.commands.registerCommand(
         'devmetrics.selectFolder',
@@ -34,7 +34,7 @@ export async function activate(context: vscode.ExtensionContext) {
                     vscode.ConfigurationTarget.Global
                 )
             vscode.window.showInformationMessage(
-                'Folder selected: ' + folderURI
+                'Folder selected: ' + folderURI.split('/').pop()
             )
         }
     )
@@ -45,7 +45,6 @@ export async function activate(context: vscode.ExtensionContext) {
             const projectFolderPath = (await vscode.workspace
                 .getConfiguration()
                 .get('devmetrics.projectFolderPath')) as string
-            console.log(projectFolderPath)
 
             if (!projectFolderPath) {
                 await vscode.window.showErrorMessage(
@@ -55,11 +54,11 @@ export async function activate(context: vscode.ExtensionContext) {
                 return
             }
 
-            diffAnalyzer = new ProjectDiffAnalyzer(
+            diffAnalyzer = new CodeChangeTracker(
                 projectFolderPath,
                 context.globalStorageUri.fsPath
             )
-            await diffAnalyzer.init()
+            await diffAnalyzer.startTracking()
 
             await vscode.workspace
                 .getConfiguration()
@@ -92,11 +91,11 @@ export async function activate(context: vscode.ExtensionContext) {
                 .update(projectFolderPath)
                 .digest('hex')
 
-            const metricsStorage = new MetricsStorage(
+            const metricsStorage = new ProjectMetricsDatabase(
                 context.globalStorageUri.fsPath,
                 sanitizedProjectFolderName
             )
-            const metrics = await metricsStorage.getMetrics()
+            const metrics = await metricsStorage.loadMetrics()
 
             if (metrics.length === 0) {
                 vscode.window.showInformationMessage('No metrics available.')
@@ -105,7 +104,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
             // Basic UI: Show metrics in a QuickPick
             // TODO: Have panel in future
-            const quickPickItems = metrics.map((metric: Metric) => ({
+            const quickPickItems = metrics.map((metric: CodeChangeMetrics) => ({
                 label: `${metric.summary.filesChanged} files changed with ${metric.summary.insertions}+++ ${metric.summary.deletions}---`,
                 metric: metric,
             }))
@@ -136,7 +135,7 @@ export async function activate(context: vscode.ExtensionContext) {
         {
             dispose: async () => {
                 if (diffAnalyzer) {
-                    await diffAnalyzer.dispose()
+                    await diffAnalyzer.stopTracking()
                 }
             },
         }

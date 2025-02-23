@@ -1,6 +1,6 @@
-import { DiffData } from '../lib/GitSnapshotManager'
+import { CodeChanges } from '../lib/GitChangeRecorder'
 
-export interface Metric extends DiffData {
+export interface CodeChangeMetrics extends CodeChanges {
     id?: number
     diffSummaryMessage: string
     startTime: number

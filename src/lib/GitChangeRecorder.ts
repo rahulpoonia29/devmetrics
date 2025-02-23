@@ -1,7 +1,6 @@
 import * as fs from 'fs'
 import * as fse from 'fs-extra'
 import * as path from 'path'
-
 import parseGitDiff from 'parse-git-diff'
 import simpleGit, { GitError, SimpleGit } from 'simple-git'
 
@@ -25,25 +24,25 @@ interface FileChange {
     modifiedLinesCount: number
 }
 
-export interface DiffData {
+export interface CodeChanges {
     summary: GitDiffSummary
     changes: FileChange[]
 }
 
-export class GitSnapshotManager {
+export class GitChangeRecorder {
     private readonly sourceFolderPath: string
-    private readonly repoFolderPath: string
-    private prevCommitHash: string | null = null
+    private readonly repositoryFolderPath: string
+    private previousCommitHash: string | null = null
     private readonly git: SimpleGit
 
-    constructor(sourceFolderPath: string, repoFolderPath: string) {
+    constructor(sourceFolderPath: string, repositoryFolderPath: string) {
         this.sourceFolderPath = sourceFolderPath
-        this.repoFolderPath = repoFolderPath
-        fse.ensureDirSync(this.repoFolderPath)
-        this.git = simpleGit(this.repoFolderPath)
+        this.repositoryFolderPath = repositoryFolderPath
+        fse.ensureDirSync(this.repositoryFolderPath)
+        this.git = simpleGit(this.repositoryFolderPath)
     }
 
-    public async init(): Promise<void> {
+    public async initializeRepository(): Promise<void> {
         if (!fs.existsSync(this.sourceFolderPath)) {
             throw new Error('Source folder does not exist.')
         }
@@ -52,18 +51,27 @@ export class GitSnapshotManager {
             throw new Error('Source path is not a directory.')
         }
 
-        fse.ensureDirSync(this.repoFolderPath)
-        const gitDir: string = path.join(this.repoFolderPath, '.git')
+        fse.ensureDirSync(this.repositoryFolderPath)
+        const gitDirectory: string = path.join(
+            this.repositoryFolderPath,
+            '.git'
+        )
 
-        if (!fs.existsSync(gitDir)) {
+        if (!fs.existsSync(gitDirectory)) {
             try {
                 await this.git.init()
-                await fse.copy(this.sourceFolderPath, this.repoFolderPath, {
-                    overwrite: true,
-                    filter: this.excludeDotGitFolder,
-                })
+                await fse.copy(
+                    this.sourceFolderPath,
+                    this.repositoryFolderPath,
+                    {
+                        overwrite: true,
+                        filter: this.excludeGitFolder,
+                    }
+                )
 
-                const files: string[] = await fse.readdir(this.repoFolderPath)
+                const files: string[] = await fse.readdir(
+                    this.repositoryFolderPath
+                )
                 if (files.length === 0) {
                     throw new Error('No files in source folder to track')
                 }
@@ -84,17 +92,17 @@ export class GitSnapshotManager {
         }
 
         try {
-            this.prevCommitHash = await this.git.revparse(['HEAD'])
+            this.previousCommitHash = await this.git.revparse(['HEAD'])
         } catch (error) {
-            this.prevCommitHash = null
+            this.previousCommitHash = null
         }
     }
 
-    public async takeSnapshot(): Promise<DiffData | void> {
+    public async captureChanges(): Promise<CodeChanges | void> {
         try {
-            await fse.copy(this.sourceFolderPath, this.repoFolderPath, {
+            await fse.copy(this.sourceFolderPath, this.repositoryFolderPath, {
                 overwrite: true,
-                filter: this.excludeDotGitFolder,
+                filter: this.excludeGitFolder,
             })
 
             await this.git.add('.')
@@ -113,18 +121,20 @@ export class GitSnapshotManager {
 
             const newCommitHash = await this.git.revparse(['HEAD'])
 
-            if (!this.prevCommitHash || this.prevCommitHash === newCommitHash) {
-                this.prevCommitHash = newCommitHash
+            if (
+                !this.previousCommitHash ||
+                this.previousCommitHash === newCommitHash
+            ) {
+                this.previousCommitHash = newCommitHash
                 return
             }
 
-            // Get detailed diff string
             const diffString = await this.git.diff([
-                this.prevCommitHash,
+                this.previousCommitHash,
                 newCommitHash,
             ])
             const diffSummary = await this.git.diffSummary([
-                this.prevCommitHash,
+                this.previousCommitHash,
                 newCommitHash,
             ])
             const diffObject = parseGitDiff(diffString)
@@ -137,7 +147,7 @@ export class GitSnapshotManager {
 
             const lineChanges = this.extractFileChanges(diffObject)
 
-            this.prevCommitHash = newCommitHash
+            this.previousCommitHash = newCommitHash
             return {
                 summary,
                 changes: lineChanges,
@@ -194,7 +204,7 @@ export class GitSnapshotManager {
 
             return {
                 filePath: file.path,
-                changeType: file.type, //DeletedFile, ChangedFile, AddedFile, RenamedFile (From parse-git-diff)
+                changeType: file.type,
                 lineChanges,
                 addedLinesCount,
                 deletedLinesCount,
@@ -205,7 +215,7 @@ export class GitSnapshotManager {
         return fileChanges
     }
 
-    private excludeDotGitFolder(src: string, dest: string): boolean {
+    private excludeGitFolder(src: string, dest: string): boolean {
         return (
             !src.includes(path.sep + '.git' + path.sep) &&
             src !== path.join(dest, '.git')
