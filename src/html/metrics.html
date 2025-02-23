@@ -1,0 +1,228 @@
+<!doctype html>
+<html>
+    <head>
+        <style>
+            body {
+                padding: 0;
+                margin: 0;
+                font-family: var(--vscode-font-family);
+                font-size: 12px;
+                line-height: 1.4;
+            }
+
+            .timeline {
+                padding: 16px;
+            }
+
+            .commit {
+                border-left: 2px solid var(--vscode-textLink-foreground);
+                margin: 24px 0;
+                padding-left: 16px;
+                position: relative;
+            }
+
+            .commit::before {
+                content: '';
+                position: absolute;
+                left: -6px;
+                top: 0;
+                width: 10px;
+                height: 10px;
+                border-radius: 50%;
+                background: var(--vscode-textLink-foreground);
+            }
+
+            .commit-header {
+                display: flex;
+                align-items: baseline;
+                gap: 12px;
+                margin-bottom: 6px;
+            }
+
+            .commit-message {
+                font-weight: 500;
+                color: var(--vscode-editor-foreground);
+            }
+
+            .commit-time {
+                color: var(--vscode-descriptionForeground);
+                font-size: 11px;
+            }
+
+            .commit-stats {
+                display: flex;
+                gap: 16px;
+                color: var(--vscode-descriptionForeground);
+                margin-bottom: 6px;
+                font-family: var(--vscode-editor-font-family);
+            }
+
+            .files {
+                display: grid;
+                grid-template-columns: 16px 1fr auto;
+                gap: 4px 8px;
+                margin-left: -2px;
+            }
+
+            .file-icon {
+                font-family: var(--vscode-editor-font-family);
+                width: 16px;
+                text-align: center;
+                opacity: 0.8;
+            }
+
+            .file-path {
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+                opacity: 0.9;
+                font-family: var(--vscode-editor-font-family);
+            }
+
+            .file-changes {
+                font-family: var(--vscode-editor-font-family);
+                white-space: nowrap;
+            }
+
+            .addition {
+                color: var(--vscode-gitDecoration-addedResourceForeground);
+            }
+            .deletion {
+                color: var(--vscode-gitDecoration-deletedResourceForeground);
+            }
+            .modification {
+                color: var(--vscode-gitDecoration-modifiedResourceForeground);
+            }
+            .chart-container {
+                margin: 20px 0 40px 0;
+                height: 300px;
+            }
+        </style>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    </head>
+    <body>
+        <div class="timeline">
+            <div class="chart-container">
+                <canvas id="metricsChart"></canvas>
+            </div>
+            <div id="commitList"></div>
+        </div>
+
+        <script>
+            // Metrics data will be injected here
+            const metrics = __METRICS_DATA__
+
+            // Function to format the date
+            function formatDate(date) {
+                const options = {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                }
+                return new Date(date).toLocaleDateString(undefined, options)
+            }
+
+            // Create activity chart
+            const ctx = document.getElementById('metricsChart').getContext('2d')
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: metrics.map((m) => formatDate(m.startTime)),
+                    datasets: [
+                        {
+                            label: 'Insertions',
+                            data: metrics.map((m) => m.summary.insertions),
+                            borderColor: 'rgb(76, 175, 80)',
+                            backgroundColor: 'rgba(76, 175, 80, 0.2)',
+                            tension: 0.4,
+                            fill: true,
+                        },
+                        {
+                            label: 'Deletions',
+                            data: metrics.map((m) => m.summary.deletions),
+                            borderColor: 'rgb(244, 67, 54)',
+                            backgroundColor: 'rgba(244, 67, 54, 0.2)',
+                            tension: 0.4,
+                            fill: true,
+                        },
+                    ],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Time',
+                            },
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Changes',
+                            },
+                            beginAtZero: true,
+                        },
+                    },
+                },
+            })
+
+            // Render commit list
+            document.getElementById('commitList').innerHTML = metrics
+                .reverse()
+                .map(
+                    (metric) => `
+                    <div class="commit">
+                        <div class="commit-header">
+                            <span class="commit-message">${metric.diffSummaryMessage}</span>
+                            <span class="commit-time">${formatDate(metric.startTime)}</span>
+                        </div>
+                        <div class="commit-stats">
+                            <span>${metric.summary.filesChanged} files</span>
+                            <span class="addition">+${metric.summary.insertions}</span>
+                            <span class="deletion">-${metric.summary.deletions}</span>
+                        </div>
+                        <div class="files">
+                            ${metric.changes
+                                .map(
+                                    (change) => `
+                                    <span class="file-icon">
+                                        ${
+                                            change.changeType === 'AddedFile'
+                                                ? '+'
+                                                : change.changeType ===
+                                                    'DeletedFile'
+                                                  ? '-'
+                                                  : change.changeType ===
+                                                      'RenamedFile'
+                                                    ? '↳'
+                                                    : '•'
+                                        }
+                                    </span>
+                                    <span class="file-path">${change.filePath}</span>
+                                    <span class="file-changes">
+                                        ${
+                                            change.insertions
+                                                ? `<span class="addition">+${change.insertions}</span>`
+                                                : ''
+                                        }
+                                        ${
+                                            change.deletions
+                                                ? `<span class="deletion">-${change.deletions}</span>`
+                                                : ''
+                                        }
+                                    </span>
+                                `
+                                )
+                                .join('')}
+                        </div>
+                    </div>
+                `
+                )
+                .join('')
+        </script>
+    </body>
+</html>

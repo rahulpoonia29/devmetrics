@@ -3,6 +3,7 @@ import * as vscode from 'vscode'
 import { ProjectMetricsDatabase } from './lib/MetricsDB'
 import { CodeChangeTracker } from './lib/CodeChangeTracker'
 import { CodeChangeMetrics } from './types/Metrics'
+import getTimeLine from './lib/getTimeline'
 
 export async function activate(context: vscode.ExtensionContext) {
     let codeChangeTracker: CodeChangeTracker | null = null
@@ -133,29 +134,16 @@ export async function activate(context: vscode.ExtensionContext) {
                 return
             }
 
-            // Basic UI: Show metrics in a QuickPick
-            // TODO: Have panel in future
-            const quickPickItems = metrics.map((metric: CodeChangeMetrics) => ({
-                label: `${metric.summary.filesChanged} files changed with ${metric.summary.insertions}+++ ${metric.summary.deletions}---`,
-                metric: metric,
-            }))
-
-            vscode.window
-                .showQuickPick(quickPickItems, {
-                    placeHolder: 'Select a metric to view details',
-                    canPickMany: false,
-                })
-                .then((selectedItem) => {
-                    if (selectedItem) {
-                        vscode.window.showInformationMessage(
-                            `Details: ${JSON.stringify(
-                                selectedItem.metric.diffSummaryMessage,
-                                null,
-                                2
-                            )}`
-                        )
-                    }
-                })
+            // Create and show WebView panel
+            const panel = vscode.window.createWebviewPanel(
+                'metricsTimeline',
+                'Timeline',
+                vscode.ViewColumn.One,
+                {
+                    enableScripts: true,
+                }
+            )
+            panel.webview.html = getTimeLine(metrics, context)
         }
     )
 
