@@ -1,9 +1,8 @@
 import * as crypto from 'crypto'
 import * as vscode from 'vscode'
-import { ProjectMetricsDatabase } from './lib/MetricsDB'
 import { CodeChangeTracker } from './lib/CodeChangeTracker'
-import { CodeChangeMetrics } from './types/Metrics'
 import getTimeLine from './lib/getTimeline'
+import { ProjectMetricsDatabase } from './lib/MetricsDB'
 
 export async function activate(context: vscode.ExtensionContext) {
     let codeChangeTracker: CodeChangeTracker | null = null
@@ -69,7 +68,7 @@ export async function activate(context: vscode.ExtensionContext) {
                     vscode.ConfigurationTarget.Global
                 )
             vscode.window.showInformationMessage(
-                'Tracking enabled using git snapshot metric method'
+                'Tracking enabled for ' + projectFolderPath.split('/').pop()
             )
         }
     )
@@ -102,6 +101,8 @@ export async function activate(context: vscode.ExtensionContext) {
             if (codeChangeTracker) {
                 await codeChangeTracker.stopTracking()
             }
+
+            vscode.window.showInformationMessage('Tracking disabled.')
         }
     )
 
@@ -147,7 +148,23 @@ export async function activate(context: vscode.ExtensionContext) {
         }
     )
 
+    const trackingStatus = vscode.window.createStatusBarItem(
+        vscode.StatusBarAlignment.Right,
+        100
+    )
+    updateTrackingStatusBar(trackingStatus)
+    trackingStatus.show()
+
+    vscode.workspace.onDidChangeConfiguration((event) => {
+        if (event.affectsConfiguration('devmetrics.trackingEnabled')) {
+            updateTrackingStatusBar(trackingStatus)
+        }
+    })
+
     context.subscriptions.push(
+        // Status bar Item
+        trackingStatus,
+        // Disposables
         selectFolderDisposable,
         enableTrackingDisposable,
         disableTrackingDisposable,
@@ -160,4 +177,20 @@ export async function activate(context: vscode.ExtensionContext) {
             },
         }
     )
+}
+
+function updateTrackingStatusBar(trackingStatus: vscode.StatusBarItem) {
+    const isTrackingEnabled = vscode.workspace
+        .getConfiguration()
+        .get('devmetrics.trackingEnabled', vscode.ConfigurationTarget.Global)
+
+    trackingStatus.text = `$(${isTrackingEnabled ? 'radio-tower' : 'circle-slash'}) DevMetrics $(${
+        isTrackingEnabled ? 'check' : 'x'
+    }) ${isTrackingEnabled ? 'Active' : 'Inactive'}`
+    trackingStatus.tooltip = isTrackingEnabled
+        ? 'DevMetrics is actively tracking code changes'
+        : 'DevMetrics tracking is disabled'
+    trackingStatus.command = isTrackingEnabled
+        ? 'devmetrics.stopTracking'
+        : 'devmetrics.startTracking'
 }
