@@ -1,7 +1,7 @@
 import * as crypto from 'crypto'
 import * as path from 'path'
 import { GitError } from 'simple-git'
-import { window } from 'vscode'
+import { ConfigurationTarget, window, workspace } from 'vscode'
 import { CodeChangeMetrics } from '../types/Metrics'
 import { GitChangeRecorder } from './GitChangeRecorder'
 import { ProjectMetricsDatabase } from './MetricsDB'
@@ -15,7 +15,7 @@ export class CodeChangeTracker {
     constructor(
         projectFolderPath: string,
         globalStorageFolderPath: string,
-        analysisIntervalMinutes: number = 0.5
+        analysisIntervalMinutes: number
     ) {
         this.analysisIntervalMilliseconds = analysisIntervalMinutes * 60 * 1000
 
@@ -59,6 +59,14 @@ export class CodeChangeTracker {
 
     public async recordChanges(): Promise<void> {
         try {
+            await workspace
+                .getConfiguration()
+                .update(
+                    'devmetrics.lastSavedTime',
+                    Date.now(),
+                    ConfigurationTarget.Global
+                )
+
             const changes = await this.changeRecorder.captureChanges()
 
             if (!changes || changes.summary.filesChanged === 0) {

@@ -3,6 +3,7 @@ import * as vscode from 'vscode'
 import { CodeChangeTracker } from './lib/CodeChangeTracker'
 import getTimeLine from './lib/getTimeline'
 import { ProjectMetricsDatabase } from './lib/MetricsDB'
+import path from 'path'
 
 export async function activate(context: vscode.ExtensionContext) {
     let codeChangeTracker: CodeChangeTracker | null = null
@@ -25,7 +26,7 @@ export async function activate(context: vscode.ExtensionContext) {
                 await vscode.window.showErrorMessage('No folder selected')
                 return
             }
-            const folderURI = folder[0].fsPath
+            const folderURI = path.basename(folder[0].fsPath)
             await vscode.workspace
                 .getConfiguration()
                 .update(
@@ -34,7 +35,7 @@ export async function activate(context: vscode.ExtensionContext) {
                     vscode.ConfigurationTarget.Global
                 )
             vscode.window.showInformationMessage(
-                'Folder selected: ' + folderURI.split('/').pop()
+                'Folder selected: ' + folderURI
             )
         }
     )
@@ -54,9 +55,31 @@ export async function activate(context: vscode.ExtensionContext) {
                 return
             }
 
+            const isTrackingEnabled = vscode.workspace
+                .getConfiguration()
+                .get(
+                    'devmetrics.trackingEnabled',
+                    vscode.ConfigurationTarget.Global
+                )
+
+            if (isTrackingEnabled) {
+                vscode.window.showInformationMessage(
+                    'Tracking is already enabled.'
+                )
+                return
+            }
+
+            const analysisInterval =
+                Number(
+                    vscode.workspace
+                        .getConfiguration()
+                        .get('devmetrics.analysisIntervalMinutes')
+                ) || 60
+
             codeChangeTracker = new CodeChangeTracker(
                 projectFolderPath,
-                context.globalStorageUri.fsPath
+                context.globalStorageUri.fsPath,
+                analysisInterval
             )
             await codeChangeTracker.startTracking()
 
@@ -67,8 +90,10 @@ export async function activate(context: vscode.ExtensionContext) {
                     true,
                     vscode.ConfigurationTarget.Global
                 )
+
             vscode.window.showInformationMessage(
-                'Tracking enabled for ' + projectFolderPath.split('/').pop()
+                'Tracking enabled for ' +
+                    path.basename(projectFolderPath).toUpperCase()
             )
         }
     )
@@ -155,15 +180,41 @@ export async function activate(context: vscode.ExtensionContext) {
     updateTrackingStatusBar(trackingStatus)
     trackingStatus.show()
 
+    const lastSavedStatus = vscode.window.createStatusBarItem(
+        vscode.StatusBarAlignment.Right,
+        99
+    )
+    updateLastSavedStatus(lastSavedStatus)
+    lastSavedStatus.show()
+
     vscode.workspace.onDidChangeConfiguration((event) => {
         if (event.affectsConfiguration('devmetrics.trackingEnabled')) {
             updateTrackingStatusBar(trackingStatus)
         }
+        if (event.affectsConfiguration('devmetrics.lastSavedTime')) {
+            updateLastSavedStatus(lastSavedStatus)
+        }
     })
+
+    vscode.workspace.onDidChangeWorkspaceFolders(() => {
+        updateTrackingStatusBar(trackingStatus)
+        updateLastSavedStatus(lastSavedStatus)
+    })
+
+    if (
+        vscode.workspace
+            .getConfiguration()
+            .get(
+                'devmetrics.trackingEnabled',
+                vscode.ConfigurationTarget.Global
+            )
+    )
+        vscode.commands.executeCommand('devmetrics.startTracking')
 
     context.subscriptions.push(
         // Status bar Item
         trackingStatus,
+        lastSavedStatus,
         // Disposables
         selectFolderDisposable,
         enableTrackingDisposable,
@@ -193,4 +244,35 @@ function updateTrackingStatusBar(trackingStatus: vscode.StatusBarItem) {
     trackingStatus.command = isTrackingEnabled
         ? 'devmetrics.stopTracking'
         : 'devmetrics.startTracking'
+}
+
+function updateLastSavedStatus(lastSavedStatus: vscode.StatusBarItem) {
+    const lastSavedTime = vscode.workspace
+        .getConfiguration()
+        .get('devmetrics.lastSavedTime', vscode.ConfigurationTarget.Global)
+
+    if (
+        lastSavedTime === undefined ||
+        null ||
+        lastSavedTime.toString() === '' ||
+        isNaN(new Date(lastSavedTime).getTime())
+    ) {
+        lastSavedStatus.text = '$(sync) No saves'
+        lastSavedStatus.tooltip = 'Start tracking to collect metrics'
+    } else {
+        const timeAgo = getTimeAgo(new Date(lastSavedTime))
+        lastSavedStatus.text = `$(database) Saved ${timeAgo}`
+        lastSavedStatus.tooltip = `Last metrics save: ${new Date(lastSavedTime).toLocaleString()}`
+    }
+    lastSavedStatus.command = 'devmetrics.showMetrics'
+}
+
+function getTimeAgo(date: Date): string {
+    const now = new Date()
+    const seconds = Math.floor((now.getTime() - date.getTime()) / 1000)
+
+    if (seconds < 60) return 'just now'
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`
+    return `${Math.floor(seconds / 86400)}d ago`
 }

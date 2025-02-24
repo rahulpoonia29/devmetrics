@@ -50,6 +50,10 @@
                     "default": false,
                     "description": "Whether or not to track metrics for the project folder."
                 },
+                "devmetrics.lastSavedTime": {
+                    "type": "number",
+                    "description": "The last time metrics were synced."
+                },
                 "devmetrics.analysisIntervalMinutes": {
                     "type": "number",
                     "default": 10,
