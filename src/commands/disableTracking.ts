@@ -1,29 +1,31 @@
-import * as vscode from 'vscode'
+import { ConfigurationTarget, window, workspace } from 'vscode'
 import { CodeChangeTracker } from '../lib/CodeChangeTracker'
 
-export async function disableTracking(codeChangeTracker?: CodeChangeTracker) {
-    const isTrackingEnabled = vscode.workspace
+export default async function disableTracking(
+    codeChangeTracker?: CodeChangeTracker
+) {
+    const isTrackingEnabled = workspace
         .getConfiguration()
-        .get('devmetrics.trackingEnabled', vscode.ConfigurationTarget.Global)
+        .get('devmetrics.trackingEnabled', ConfigurationTarget.Global)
 
     if (!isTrackingEnabled) {
-        vscode.window.showInformationMessage(
-            'Tracking is not currently enabled.'
-        )
+        window.showInformationMessage('DevMetrics Tracking Status', {
+            modal: true,
+            detail: 'Tracking is already disabled. No action needed.',
+        })
         return
     }
 
-    await vscode.workspace
+    await workspace
         .getConfiguration()
-        .update(
-            'devmetrics.trackingEnabled',
-            false,
-            vscode.ConfigurationTarget.Global
-        )
+        .update('devmetrics.trackingEnabled', false, ConfigurationTarget.Global)
 
     if (codeChangeTracker) {
         await codeChangeTracker.stopTracking()
     }
 
-    vscode.window.showInformationMessage('Tracking disabled.')
+    window.showInformationMessage('DevMetrics Tracking Disabled', {
+        modal: true,
+        detail: 'Your coding activity tracking has been stopped successfully. You can re-enable it at any time through settings.',
+    })
 }

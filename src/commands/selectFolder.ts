@@ -1,29 +1,47 @@
-import * as vscode from 'vscode'
-import path from 'path'
+import { basename } from 'path'
+import {
+    window,
+    workspace,
+    ConfigurationTarget,
+    type OpenDialogOptions,
+} from 'vscode'
 
-export async function selectFolder() {
-    const folder = await vscode.window.showOpenDialog({
-        title: 'Select a folder to track metrics',
-        openLabel: 'Select Folder',
+export default async function selectFolder() {
+    const dialogOptions: OpenDialogOptions = {
+        title: 'Select Project Folder',
+        openLabel: 'Track Metrics for this Folder',
         canSelectFolders: true,
         canSelectFiles: false,
         canSelectMany: false,
-        defaultUri: vscode.workspace.workspaceFolders
-            ? vscode.workspace.workspaceFolders[0].uri
+        defaultUri: workspace.workspaceFolders
+            ? workspace.workspaceFolders[0].uri
             : undefined,
-    })
+    }
+
+    const folder = await window.showOpenDialog(dialogOptions)
 
     if (!folder) {
-        await vscode.window.showErrorMessage('No folder selected')
+        await window.showErrorMessage('Project folder selection cancelled', {
+            modal: true,
+            detail: 'Please select a folder to track development metrics.',
+        })
         return
     }
-    const folderURI = path.basename(folder[0].fsPath)
-    await vscode.workspace
+
+    const folderName = basename(folder[0].fsPath)
+    await workspace
         .getConfiguration()
         .update(
             'devmetrics.projectFolderPath',
-            folderURI,
-            vscode.ConfigurationTarget.Global
+            folderName,
+            ConfigurationTarget.Global
         )
-    vscode.window.showInformationMessage('Folder selected: ' + folderURI)
+
+    await window.showInformationMessage(
+        'Project Folder Configuration Updated',
+        {
+            modal: false,
+            detail: `Development metrics will be tracked for: ${folderName}`,
+        }
+    )
 }

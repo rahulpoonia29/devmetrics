@@ -1,35 +1,44 @@
-import * as vscode from 'vscode'
+import { basename } from 'path'
+import {
+    ConfigurationTarget,
+    ExtensionContext,
+    commands,
+    window,
+    workspace,
+} from 'vscode'
 import { CodeChangeTracker } from '../lib/CodeChangeTracker'
-import path from 'path'
 
-export async function enableTracking(
-    context: vscode.ExtensionContext,
+export default async function enableTracking(
+    context: ExtensionContext,
     existingCodeChangeTracker: CodeChangeTracker | null = null
 ): Promise<{ codeChangeTracker: CodeChangeTracker } | void> {
-    const projectFolderPath = (await vscode.workspace
+    const projectFolderPath = (await workspace
         .getConfiguration()
         .get('devmetrics.projectFolderPath')) as string
 
     if (!projectFolderPath) {
-        await vscode.window.showErrorMessage(
-            'No folder selected. Please select a folder to track metrics.'
-        )
-        await vscode.commands.executeCommand('devmetrics.selectFolder')
+        await window.showErrorMessage('Project folder not configured', {
+            modal: true,
+            detail: 'DevMetrics requires a project folder to track metrics. Please select a folder to continue.',
+        })
+        await commands.executeCommand('devmetrics.selectFolder')
         return
     }
 
-    const isTrackingEnabled = vscode.workspace
+    const isTrackingEnabled = workspace
         .getConfiguration()
-        .get('devmetrics.trackingEnabled', vscode.ConfigurationTarget.Global)
+        .get('devmetrics.trackingEnabled', ConfigurationTarget.Global)
 
     if (isTrackingEnabled) {
-        vscode.window.showInformationMessage('Tracking is already enabled.')
+        await window.showInformationMessage('DevMetrics Tracking Status', {
+            detail: 'Metrics tracking is already active for this project.',
+        })
         return
     }
 
     const analysisInterval =
         Number(
-            vscode.workspace
+            workspace
                 .getConfiguration()
                 .get('devmetrics.analysisIntervalMinutes')
         ) || 60
@@ -43,16 +52,12 @@ export async function enableTracking(
         )
     await codeChangeTracker.startTracking()
 
-    await vscode.workspace
+    await workspace
         .getConfiguration()
-        .update(
-            'devmetrics.trackingEnabled',
-            true,
-            vscode.ConfigurationTarget.Global
-        )
+        .update('devmetrics.trackingEnabled', true, ConfigurationTarget.Global)
 
-    vscode.window.showInformationMessage(
-        'Tracking enabled for ' + path.basename(projectFolderPath).toUpperCase()
-    )
+    await window.showInformationMessage('DevMetrics Tracking Enabled', {
+        detail: `Now tracking metrics for ${basename(projectFolderPath).toUpperCase()}. Analysis interval: ${analysisInterval} minutes.`,
+    })
     return { codeChangeTracker }
 }

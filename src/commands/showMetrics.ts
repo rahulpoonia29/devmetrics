@@ -1,19 +1,27 @@
-import * as vscode from 'vscode'
-import * as crypto from 'crypto'
-import getTimeLine from '../lib/TimelineGenerator.ts'
+import { createHash } from 'crypto'
+import {
+    ExtensionContext,
+    ViewColumn,
+    WebviewPanel,
+    window,
+    workspace,
+} from 'vscode'
+import getTimeLine from '../lib/generateTimelineHTML'
 import { MetricsDatabase } from '../lib/MetricsDatabase'
 
-export async function showMetrics(context: vscode.ExtensionContext) {
-    const projectFolderPath = vscode.workspace
+export default async function showMetrics(context: ExtensionContext) {
+    const projectFolderPath = workspace
         .getConfiguration()
         .get('devmetrics.projectFolderPath') as string
     if (!projectFolderPath) {
-        vscode.window.showErrorMessage('Please select a project folder first.')
+        await window.showErrorMessage('Project Folder Not Selected', {
+            modal: true,
+            detail: 'Please configure a project folder in settings to view metrics.',
+        })
         return
     }
 
-    const sanitizedProjectFolderName = crypto
-        .createHash('md5')
+    const sanitizedProjectFolderName = createHash('md5')
         .update(projectFolderPath)
         .digest('hex')
 
@@ -24,15 +32,17 @@ export async function showMetrics(context: vscode.ExtensionContext) {
     const metrics = await metricsStorage.loadMetrics()
 
     if (metrics.length === 0) {
-        vscode.window.showInformationMessage('No metrics available.')
+        await window.showInformationMessage('No Metrics Available', {
+            detail: 'Start coding to generate metrics data.',
+        })
         return
     }
 
     // Create and show WebView panel
-    const panel = vscode.window.createWebviewPanel(
+    const panel: WebviewPanel = window.createWebviewPanel(
         'metricsTimeline',
-        'Timeline',
-        vscode.ViewColumn.One,
+        'Developer Metrics Timeline',
+        ViewColumn.One,
         {
             enableScripts: true,
         }
