@@ -4,10 +4,10 @@ import { GitError } from 'simple-git'
 import { ConfigurationTarget, window, workspace } from 'vscode'
 import { CodeChangeMetrics } from '../types/Metrics'
 import { GitChangeRecorder } from './GitChangeRecorder'
-import { ProjectMetricsDatabase } from './MetricsDB'
+import { MetricsDatabase } from './MetricsDatabase'
 
 export class CodeChangeTracker {
-    private metricsDatabase: ProjectMetricsDatabase
+    private metricsDatabase: MetricsDatabase
     private readonly changeRecorder: GitChangeRecorder
     private readonly analysisIntervalMilliseconds: number
     private analysisTimer: NodeJS.Timeout | null = null
@@ -33,7 +33,7 @@ export class CodeChangeTracker {
             projectFolderPath,
             trackedRepositoryFolder
         )
-        this.metricsDatabase = new ProjectMetricsDatabase(
+        this.metricsDatabase = new MetricsDatabase(
             globalStorageFolderPath,
             projectHash
         )
@@ -83,7 +83,7 @@ export class CodeChangeTracker {
 
             if (
                 this.metricsDatabase &&
-                this.metricsDatabase instanceof ProjectMetricsDatabase
+                this.metricsDatabase instanceof MetricsDatabase
             ) {
                 await this.metricsDatabase.saveMetrics(metrics)
             }

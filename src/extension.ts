@@ -1,8 +1,8 @@
 import * as crypto from 'crypto'
 import * as vscode from 'vscode'
 import { CodeChangeTracker } from './lib/CodeChangeTracker'
-import getTimeLine from './lib/getTimeline'
-import { ProjectMetricsDatabase } from './lib/MetricsDB'
+import getTimeLine from './lib/TimelineGenerator.ts'
+import { MetricsDatabase } from './lib/MetricsDatabase'
 import path from 'path'
 
 export async function activate(context: vscode.ExtensionContext) {
@@ -149,7 +149,7 @@ export async function activate(context: vscode.ExtensionContext) {
                 .update(projectFolderPath)
                 .digest('hex')
 
-            const metricsStorage = new ProjectMetricsDatabase(
+            const metricsStorage = new MetricsDatabase(
                 context.globalStorageUri.fsPath,
                 sanitizedProjectFolderName
             )

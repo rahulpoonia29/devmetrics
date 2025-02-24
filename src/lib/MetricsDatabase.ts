@@ -2,7 +2,7 @@ import * as fs from 'fs/promises'
 import * as path from 'path'
 import { CodeChangeMetrics } from '../types/Metrics'
 
-export class ProjectMetricsDatabase {
+export class MetricsDatabase {
     private readonly databaseFolderPath: string
 
     constructor(databaseFolderPath: string, projectName: string) {
