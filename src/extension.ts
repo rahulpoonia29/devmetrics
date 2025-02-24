@@ -1,8 +1,13 @@
-import * as crypto from 'crypto'
 import * as vscode from 'vscode'
 import { CodeChangeTracker } from './lib/CodeChangeTracker'
 import getTimeLine from './lib/TimelineGenerator.ts'
 import { MetricsDatabase } from './lib/MetricsDatabase'
+import {
+    selectFolder,
+    enableTracking,
+    disableTracking,
+    showMetrics,
+} from './commands'
 import path from 'path'
 
 export async function activate(context: vscode.ExtensionContext) {
@@ -11,165 +16,36 @@ export async function activate(context: vscode.ExtensionContext) {
     const selectFolderDisposable = vscode.commands.registerCommand(
         'devmetrics.selectFolder',
         async () => {
-            const folder = await vscode.window.showOpenDialog({
-                title: 'Select a folder to track metrics',
-                openLabel: 'Select Folder',
-                canSelectFolders: true,
-                canSelectFiles: false,
-                canSelectMany: false,
-                defaultUri: vscode.workspace.workspaceFolders
-                    ? vscode.workspace.workspaceFolders[0].uri
-                    : undefined,
-            })
-
-            if (!folder) {
-                await vscode.window.showErrorMessage('No folder selected')
-                return
-            }
-            const folderURI = path.basename(folder[0].fsPath)
-            await vscode.workspace
-                .getConfiguration()
-                .update(
-                    'devmetrics.projectFolderPath',
-                    folderURI,
-                    vscode.ConfigurationTarget.Global
-                )
-            vscode.window.showInformationMessage(
-                'Folder selected: ' + folderURI
-            )
+            await selectFolder()
         }
     )
 
     const enableTrackingDisposable = vscode.commands.registerCommand(
         'devmetrics.startTracking',
         async () => {
-            const projectFolderPath = (await vscode.workspace
-                .getConfiguration()
-                .get('devmetrics.projectFolderPath')) as string
-
-            if (!projectFolderPath) {
-                await vscode.window.showErrorMessage(
-                    'No folder selected. Please select a folder to track metrics.'
-                )
-                await vscode.commands.executeCommand('devmetrics.selectFolder')
-                return
+            const result = await enableTracking(context, codeChangeTracker)
+            if (result && result.codeChangeTracker) {
+                codeChangeTracker = result.codeChangeTracker
             }
-
-            const isTrackingEnabled = vscode.workspace
-                .getConfiguration()
-                .get(
-                    'devmetrics.trackingEnabled',
-                    vscode.ConfigurationTarget.Global
-                )
-
-            if (isTrackingEnabled) {
-                vscode.window.showInformationMessage(
-                    'Tracking is already enabled.'
-                )
-                return
-            }
-
-            const analysisInterval =
-                Number(
-                    vscode.workspace
-                        .getConfiguration()
-                        .get('devmetrics.analysisIntervalMinutes')
-                ) || 60
-
-            codeChangeTracker = new CodeChangeTracker(
-                projectFolderPath,
-                context.globalStorageUri.fsPath,
-                analysisInterval
-            )
-            await codeChangeTracker.startTracking()
-
-            await vscode.workspace
-                .getConfiguration()
-                .update(
-                    'devmetrics.trackingEnabled',
-                    true,
-                    vscode.ConfigurationTarget.Global
-                )
-
-            vscode.window.showInformationMessage(
-                'Tracking enabled for ' +
-                    path.basename(projectFolderPath).toUpperCase()
-            )
         }
     )
 
     const disableTrackingDisposable = vscode.commands.registerCommand(
         'devmetrics.stopTracking',
         async () => {
-            const isTrackingEnabled = vscode.workspace
-                .getConfiguration()
-                .get(
-                    'devmetrics.trackingEnabled',
-                    vscode.ConfigurationTarget.Global
-                )
-
-            if (!isTrackingEnabled) {
-                vscode.window.showInformationMessage(
-                    'Tracking is not currently enabled.'
-                )
-                return
-            }
-
-            await vscode.workspace
-                .getConfiguration()
-                .update(
-                    'devmetrics.trackingEnabled',
-                    false,
-                    vscode.ConfigurationTarget.Global
-                )
-
             if (codeChangeTracker) {
-                await codeChangeTracker.stopTracking()
+                await disableTracking(codeChangeTracker)
+                codeChangeTracker = null
+            } else {
+                await disableTracking()
             }
-
-            vscode.window.showInformationMessage('Tracking disabled.')
         }
     )
 
     const showMetricsDisposable = vscode.commands.registerCommand(
         'devmetrics.showMetrics',
         async () => {
-            const projectFolderPath = vscode.workspace
-                .getConfiguration()
-                .get('devmetrics.projectFolderPath') as string
-            if (!projectFolderPath) {
-                vscode.window.showErrorMessage(
-                    'Please select a project folder first.'
-                )
-                return
-            }
-
-            const sanitizedProjectFolderName = crypto
-                .createHash('md5')
-                .update(projectFolderPath)
-                .digest('hex')
-
-            const metricsStorage = new MetricsDatabase(
-                context.globalStorageUri.fsPath,
-                sanitizedProjectFolderName
-            )
-            const metrics = await metricsStorage.loadMetrics()
-
-            if (metrics.length === 0) {
-                vscode.window.showInformationMessage('No metrics available.')
-                return
-            }
-
-            // Create and show WebView panel
-            const panel = vscode.window.createWebviewPanel(
-                'metricsTimeline',
-                'Timeline',
-                vscode.ViewColumn.One,
-                {
-                    enableScripts: true,
-                }
-            )
-            panel.webview.html = getTimeLine(metrics, context)
+            await showMetrics(context)
         }
     )
 
