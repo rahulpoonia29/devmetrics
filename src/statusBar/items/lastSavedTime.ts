@@ -1,24 +1,18 @@
-import {
-    ConfigurationTarget,
-    StatusBarAlignment,
-    StatusBarItem,
-    window,
-    workspace,
-} from 'vscode'
+import { StatusBarAlignment, StatusBarItem, window, workspace } from 'vscode'
 
-export const lastSavedStatus = window.createStatusBarItem(
+export const lastSavedTime = window.createStatusBarItem(
     StatusBarAlignment.Right,
     99
 )
 
-export function updateLastSavedStatus(lastSavedStatus: StatusBarItem) {
+export function updateLastSavedTime(lastSavedStatus: StatusBarItem): void {
     const lastSavedTime = workspace
         .getConfiguration()
-        .get('devmetrics.lastSavedTime', ConfigurationTarget.Global)
+        .get<number>('devmetrics.lastSavedTime')
 
     if (
         lastSavedTime === undefined ||
-        null ||
+        lastSavedTime === null ||
         lastSavedTime.toString() === '' ||
         isNaN(new Date(lastSavedTime).getTime())
     ) {

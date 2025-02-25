@@ -1,20 +1,14 @@
-import {
-    ConfigurationTarget,
-    StatusBarAlignment,
-    StatusBarItem,
-    window,
-    workspace,
-} from 'vscode'
+import { StatusBarAlignment, StatusBarItem, window, workspace } from 'vscode'
 
 export const trackingStatus = window.createStatusBarItem(
     StatusBarAlignment.Right,
     100
 )
 
-export function updateTrackingStatusBar(trackingStatus: StatusBarItem) {
+export function updateTrackingStatus(trackingStatus: StatusBarItem): void {
     const isTrackingEnabled = workspace
         .getConfiguration()
-        .get('devmetrics.trackingEnabled', ConfigurationTarget.Global)
+        .get<boolean>('devmetrics.trackingEnabled', true)
 
     trackingStatus.text = `$(${isTrackingEnabled ? 'radio-tower' : 'circle-slash'}) DevMetrics $(${
         isTrackingEnabled ? 'check' : 'x'

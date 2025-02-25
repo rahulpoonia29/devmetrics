@@ -5,15 +5,8 @@ import {
     selectFolder,
     showMetrics,
 } from './commands'
-import {
-    lastSavedStatus,
-    updateLastSavedStatus,
-} from './statusBarItems/lastSaved'
-import {
-    trackingStatus,
-    updateTrackingStatusBar,
-} from './statusBarItems/tracking'
 import { DevelopmentActivityMonitor } from './core/DevelopmentActivityMonitor'
+import { StatusBarItems, statusBarActions } from './statusBar/index'
 
 export async function activate(context: vscode.ExtensionContext) {
     let developmentActivityMonitor: DevelopmentActivityMonitor | null = null
@@ -63,31 +56,25 @@ export async function activate(context: vscode.ExtensionContext) {
     )
 
     // Initialize status bar items
-    updateTrackingStatusBar(trackingStatus)
-    trackingStatus.show()
-    updateLastSavedStatus(lastSavedStatus)
-    lastSavedStatus.show()
+    statusBarActions.updateTrackingStatus(StatusBarItems.trackingStatus)
+    statusBarActions.updateLastSavedTime(StatusBarItems.lastSavedTime)
+    StatusBarItems.trackingStatus.show()
+    StatusBarItems.lastSavedTime.show()
 
     // Update status bar items on configuration change
     vscode.workspace.onDidChangeConfiguration((event) => {
         if (event.affectsConfiguration('devmetrics.trackingEnabled')) {
-            updateTrackingStatusBar(trackingStatus)
+            statusBarActions.updateTrackingStatus(StatusBarItems.trackingStatus)
         }
         if (event.affectsConfiguration('devmetrics.lastSavedTime')) {
-            updateLastSavedStatus(lastSavedStatus)
-        }
-        // Update on analysisIntervalMinutes change
-        if (event.affectsConfiguration('devmetrics.analysisIntervalMinutes')) {
-            if (developmentActivityMonitor) {
-                developmentActivityMonitor.restartTracking()
-            }
+            statusBarActions.updateLastSavedTime(StatusBarItems.lastSavedTime)
         }
     })
 
     // Update status bar items on workspace change
     vscode.workspace.onDidChangeWorkspaceFolders(() => {
-        updateTrackingStatusBar(trackingStatus)
-        updateLastSavedStatus(lastSavedStatus)
+        statusBarActions.updateTrackingStatus(StatusBarItems.trackingStatus)
+        statusBarActions.updateLastSavedTime(StatusBarItems.lastSavedTime)
     })
 
     // Start tracking on startup if enabled in settings
@@ -103,8 +90,8 @@ export async function activate(context: vscode.ExtensionContext) {
 
     context.subscriptions.push(
         // Status bar Items
-        trackingStatus,
-        lastSavedStatus,
+        StatusBarItems.trackingStatus,
+        StatusBarItems.lastSavedTime,
         // Disposables
         selectFolderDisposable,
         enableTrackingDisposable,
