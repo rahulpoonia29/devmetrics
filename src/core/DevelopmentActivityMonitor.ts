@@ -3,22 +3,17 @@ import * as path from 'path'
 import { GitError } from 'simple-git'
 import { ConfigurationTarget, window, workspace } from 'vscode'
 import { CodeChangeMetrics } from '../types/Metrics'
-import { GitChangeRecorder } from './GitChangeRecorder'
-import { MetricsDatabase } from './MetricsDatabase'
+import { GitChangeRecorder } from '../lib/GitChangeRecorder'
+import { MetricsDatabase } from '../lib/MetricsDatabase'
 
-export class CodeChangeTracker {
+export class DevelopmentActivityMonitor {
     private metricsDatabase: MetricsDatabase
     private readonly changeRecorder: GitChangeRecorder
-    private readonly analysisIntervalMilliseconds: number
     private analysisTimer: NodeJS.Timeout | null = null
+    private sessionStartTime: number = 0
+    private readonly checkIntervalMs = 60000 // 1 minute
 
-    constructor(
-        projectFolderPath: string,
-        globalStorageFolderPath: string,
-        analysisIntervalMinutes: number
-    ) {
-        this.analysisIntervalMilliseconds = analysisIntervalMinutes * 60 * 1000
-
+    constructor(projectFolderPath: string, globalStorageFolderPath: string) {
         const projectHash = crypto
             .createHash('md5')
             .update(projectFolderPath)
@@ -42,9 +37,12 @@ export class CodeChangeTracker {
     public async startTracking(): Promise<void> {
         try {
             await this.changeRecorder.initializeRepository()
+            this.sessionStartTime = Date.now()
             this.beginChangeAnalysis()
         } catch (error: unknown) {
-            window.showErrorMessage((error as Error).message)
+            window.showErrorMessage(
+                `Failed to start tracking: ${(error as Error).message}`
+            )
         }
     }
 
@@ -52,9 +50,27 @@ export class CodeChangeTracker {
         if (this.analysisTimer) {
             clearInterval(this.analysisTimer)
         }
+
         this.analysisTimer = setInterval(async () => {
-            await this.recordChanges()
-        }, this.analysisIntervalMilliseconds)
+            const analysisIntervalMilliseconds =
+                this.getConfiguredIntervalInMilliseconds()
+
+            const now = Date.now()
+            const elapsedTime = now - this.sessionStartTime
+
+            // *Record changes if the analysis interval has passed (Max deviation: 1 minute)
+            if (elapsedTime >= analysisIntervalMilliseconds) {
+                await this.recordChanges()
+                this.sessionStartTime = now
+            }
+        }, this.checkIntervalMs)
+    }
+
+    private getConfiguredIntervalInMilliseconds(): number {
+        const analysisIntervalMinutes: number = workspace
+            .getConfiguration()
+            .get('devmetrics.analysisIntervalMinutes', 15) as number
+        return analysisIntervalMinutes * 60 * 1000
     }
 
     public async recordChanges(): Promise<void> {
@@ -77,16 +93,11 @@ export class CodeChangeTracker {
             const metrics: CodeChangeMetrics = {
                 ...changes,
                 diffSummaryMessage,
-                startTime: Date.now() - this.analysisIntervalMilliseconds,
+                startTime: this.sessionStartTime,
                 endTime: Date.now(),
             }
 
-            if (
-                this.metricsDatabase &&
-                this.metricsDatabase instanceof MetricsDatabase
-            ) {
-                await this.metricsDatabase.saveMetrics(metrics)
-            }
+            await this.metricsDatabase.saveMetrics(metrics)
 
             window.showInformationMessage('Saved code change metrics.')
         } catch (error: unknown) {
@@ -106,6 +117,7 @@ export class CodeChangeTracker {
     }
 
     public restartTracking(): void {
+        this.sessionStartTime = Date.now()
         this.beginChangeAnalysis()
     }
 }
