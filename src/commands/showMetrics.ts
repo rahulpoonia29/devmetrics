@@ -14,7 +14,7 @@ export default async function showMetrics(context: ExtensionContext) {
         .getConfiguration()
         .get('devmetrics.projectFolderPath') as string
     if (!projectFolderPath) {
-        await window.showErrorMessage('Project Folder Not Selected', {
+        await window.showErrorMessage('Project folder not selected.', {
             modal: true,
             detail: 'Please configure a project folder in settings to view metrics.',
         })
@@ -32,7 +32,7 @@ export default async function showMetrics(context: ExtensionContext) {
     const metrics = await metricsStorage.loadMetrics()
 
     if (metrics.length === 0) {
-        await window.showInformationMessage('No Metrics Available', {
+        await window.showInformationMessage('No metrics available.', {
             detail: 'Start coding to generate metrics data.',
         })
         return

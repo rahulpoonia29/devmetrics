@@ -6,20 +6,20 @@ import {
     window,
     workspace,
 } from 'vscode'
-import { CodeChangeTracker } from '../lib/CodeChangeTracker'
+import { DevelopmentActivityMonitor } from '../core/DevelopmentActivityMonitor'
 
 export default async function enableTracking(
     context: ExtensionContext,
-    existingCodeChangeTracker: CodeChangeTracker | null = null
-): Promise<{ codeChangeTracker: CodeChangeTracker } | void> {
+    existingMonitor: DevelopmentActivityMonitor | null = null
+): Promise<DevelopmentActivityMonitor | void> {
     const projectFolderPath = (await workspace
         .getConfiguration()
         .get('devmetrics.projectFolderPath')) as string
 
     if (!projectFolderPath) {
-        await window.showErrorMessage('Project folder not configured', {
+        await window.showErrorMessage('Project folder not set up.', {
             modal: true,
-            detail: 'DevMetrics requires a project folder to track metrics. Please select a folder to continue.',
+            detail: 'DevMetrics needs a project folder to track metrics. Please select a folder to continue.',
         })
         await commands.executeCommand('devmetrics.selectFolder')
         return
@@ -44,11 +44,10 @@ export default async function enableTracking(
         ) || 60
 
     const codeChangeTracker =
-        existingCodeChangeTracker ||
-        new CodeChangeTracker(
+        existingMonitor ||
+        new DevelopmentActivityMonitor(
             projectFolderPath,
-            context.globalStorageUri.fsPath,
-            analysisInterval
+            context.globalStorageUri.fsPath
         )
     await codeChangeTracker.startTracking()
 
@@ -56,8 +55,8 @@ export default async function enableTracking(
         .getConfiguration()
         .update('devmetrics.trackingEnabled', true, ConfigurationTarget.Global)
 
-    await window.showInformationMessage('DevMetrics Tracking Enabled', {
-        detail: `Now tracking metrics for ${basename(projectFolderPath).toUpperCase()}. Analysis interval: ${analysisInterval} minutes.`,
+    await window.showInformationMessage('DevMetrics Tracking is now active.', {
+        detail: `Now tracking metrics for ${basename(projectFolderPath).toUpperCase()}.`,
     })
-    return { codeChangeTracker }
+    return codeChangeTracker
 }

@@ -5,12 +5,18 @@ import {
     selectFolder,
     showMetrics,
 } from './commands'
-import { CodeChangeTracker } from './lib/CodeChangeTracker'
-import { lastSavedStatus, updateLastSavedStatus } from './statusBar/lastSaved'
-import { trackingStatus, updateTrackingStatusBar } from './statusBar/tracking'
+import {
+    lastSavedStatus,
+    updateLastSavedStatus,
+} from './statusBarItems/lastSaved'
+import {
+    trackingStatus,
+    updateTrackingStatusBar,
+} from './statusBarItems/tracking'
+import { DevelopmentActivityMonitor } from './core/DevelopmentActivityMonitor'
 
 export async function activate(context: vscode.ExtensionContext) {
-    let codeChangeTracker: CodeChangeTracker | null = null
+    let developmentActivityMonitor: DevelopmentActivityMonitor | null = null
 
     const selectFolderDisposable = vscode.commands.registerCommand(
         'devmetrics.selectFolder',
@@ -22,9 +28,12 @@ export async function activate(context: vscode.ExtensionContext) {
     const enableTrackingDisposable = vscode.commands.registerCommand(
         'devmetrics.startTracking',
         async () => {
-            const result = await enableTracking(context, codeChangeTracker)
-            if (result && result.codeChangeTracker) {
-                codeChangeTracker = result.codeChangeTracker
+            const result = await enableTracking(
+                context,
+                developmentActivityMonitor
+            )
+            if (result) {
+                developmentActivityMonitor = result
             }
         }
     )
@@ -32,11 +41,16 @@ export async function activate(context: vscode.ExtensionContext) {
     const disableTrackingDisposable = vscode.commands.registerCommand(
         'devmetrics.stopTracking',
         async () => {
-            if (codeChangeTracker) {
-                await disableTracking(codeChangeTracker)
-                codeChangeTracker = null
+            if (developmentActivityMonitor) {
+                await disableTracking(developmentActivityMonitor)
+                developmentActivityMonitor = null
             } else {
-                await disableTracking()
+                vscode.window.showInformationMessage(
+                    'Tracking is not currently active.',
+                    {
+                        detail: 'You can enable it to start tracking your coding activity.',
+                    }
+                )
             }
         }
     )
@@ -61,6 +75,12 @@ export async function activate(context: vscode.ExtensionContext) {
         }
         if (event.affectsConfiguration('devmetrics.lastSavedTime')) {
             updateLastSavedStatus(lastSavedStatus)
+        }
+        // Update on analysisIntervalMinutes change
+        if (event.affectsConfiguration('devmetrics.analysisIntervalMinutes')) {
+            if (developmentActivityMonitor) {
+                developmentActivityMonitor.restartTracking()
+            }
         }
     })
 
@@ -92,9 +112,9 @@ export async function activate(context: vscode.ExtensionContext) {
         showMetricsDisposable,
         {
             dispose: async () => {
-                if (codeChangeTracker) {
+                if (developmentActivityMonitor) {
                     // Gather and save metrics before deactivating
-                    await codeChangeTracker.stopTracking()
+                    await developmentActivityMonitor.stopTracking()
                 }
             },
         }

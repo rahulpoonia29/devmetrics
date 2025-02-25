@@ -21,10 +21,13 @@ export default async function selectFolder() {
     const folder = await window.showOpenDialog(dialogOptions)
 
     if (!folder) {
-        await window.showErrorMessage('Project folder selection cancelled', {
-            modal: true,
-            detail: 'Please select a folder to track development metrics.',
-        })
+        await window.showErrorMessage(
+            'Project folder selection was cancelled.',
+            {
+                modal: true,
+                detail: 'Please select a folder to track development metrics.',
+            }
+        )
         return
     }
 
@@ -37,11 +40,8 @@ export default async function selectFolder() {
             ConfigurationTarget.Global
         )
 
-    await window.showInformationMessage(
-        'Project Folder Configuration Updated',
-        {
-            modal: false,
-            detail: `Development metrics will be tracked for: ${folderName}`,
-        }
-    )
+    await window.showInformationMessage('Project folder has been updated.', {
+        modal: false,
+        detail: `Development metrics will now be tracked for: ${folderName}`,
+    })
 }

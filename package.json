@@ -52,14 +52,14 @@
                 },
                 "devmetrics.lastSavedTime": {
                     "type": "number",
-                    "description": "The last time metrics were synced."
+                    "description": "The last time the metrics were saved."
                 },
                 "devmetrics.analysisIntervalMinutes": {
                     "type": "number",
                     "default": 10,
-                    "minimum": 1,
-                    "maximum": 60,
-                    "description": "Interval in minutes between analysis runs"
+                    "minimum": 5,
+                    "maximum": 120,
+                    "description": "The interval, in minutes, between each automated analysis run. Minimum: 5 minutes, Maximum: 120 minutes."
                 },
                 "devmetrics.excludedPaths": {
                     "type": "array",

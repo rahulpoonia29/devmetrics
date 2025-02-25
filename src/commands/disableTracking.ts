@@ -1,17 +1,17 @@
 import { ConfigurationTarget, window, workspace } from 'vscode'
-import { CodeChangeTracker } from '../lib/CodeChangeTracker'
+import { DevelopmentActivityMonitor } from '../core/DevelopmentActivityMonitor'
 
 export default async function disableTracking(
-    codeChangeTracker?: CodeChangeTracker
+    developmentActivityMonitor: DevelopmentActivityMonitor
 ) {
     const isTrackingEnabled = workspace
         .getConfiguration()
-        .get('devmetrics.trackingEnabled', ConfigurationTarget.Global)
+        .get('devmetrics.trackingEnabled', true)
 
     if (!isTrackingEnabled) {
-        window.showInformationMessage('DevMetrics Tracking Status', {
+        window.showInformationMessage('Tracking is already turned off.', {
+            detail: 'You can enable it to start tracking your coding activity.',
             modal: true,
-            detail: 'Tracking is already disabled. No action needed.',
         })
         return
     }
@@ -20,12 +20,10 @@ export default async function disableTracking(
         .getConfiguration()
         .update('devmetrics.trackingEnabled', false, ConfigurationTarget.Global)
 
-    if (codeChangeTracker) {
-        await codeChangeTracker.stopTracking()
-    }
+    await developmentActivityMonitor.stopTracking()
 
-    window.showInformationMessage('DevMetrics Tracking Disabled', {
+    window.showInformationMessage('Tracking has been turned off.', {
+        detail: 'You can view your metrics by running the "Show Metrics" command.',
         modal: true,
-        detail: 'Your coding activity tracking has been stopped successfully. You can re-enable it at any time through settings.',
     })
 }
