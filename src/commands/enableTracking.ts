@@ -11,18 +11,18 @@ import { DevelopmentActivityMonitor } from '../core/DevelopmentActivityMonitor'
 export default async function enableTracking(
     context: ExtensionContext,
     existingMonitor: DevelopmentActivityMonitor | null = null
-): Promise<DevelopmentActivityMonitor | void> {
+): Promise<DevelopmentActivityMonitor | null> {
     const projectFolderPath = (await workspace
         .getConfiguration()
         .get('devmetrics.projectFolderPath')) as string
 
     if (!projectFolderPath) {
-        await window.showErrorMessage('Project folder not set up.', {
+        window.showErrorMessage('Project folder not set up.', {
             modal: true,
             detail: 'DevMetrics needs a project folder to track metrics. Please select a folder to continue.',
         })
         await commands.executeCommand('devmetrics.selectFolder')
-        return
+        return null
     }
 
     const isTrackingEnabled = workspace
@@ -30,18 +30,11 @@ export default async function enableTracking(
         .get('devmetrics.trackingEnabled', ConfigurationTarget.Global)
 
     if (isTrackingEnabled) {
-        await window.showInformationMessage('DevMetrics Tracking Status', {
+        window.showInformationMessage('DevMetrics Tracking Status', {
             detail: 'Metrics tracking is already active for this project.',
         })
-        return
+        return null
     }
-
-    const analysisInterval =
-        Number(
-            workspace
-                .getConfiguration()
-                .get('devmetrics.analysisIntervalMinutes')
-        ) || 60
 
     const codeChangeTracker =
         existingMonitor ||
@@ -55,7 +48,7 @@ export default async function enableTracking(
         .getConfiguration()
         .update('devmetrics.trackingEnabled', true, ConfigurationTarget.Global)
 
-    await window.showInformationMessage('DevMetrics Tracking is now active.', {
+    window.showInformationMessage('DevMetrics Tracking is now active.', {
         detail: `Now tracking metrics for ${basename(projectFolderPath).toUpperCase()}.`,
     })
     return codeChangeTracker
