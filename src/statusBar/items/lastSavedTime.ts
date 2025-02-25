@@ -14,7 +14,8 @@ export function updateLastSavedTime(lastSavedStatus: StatusBarItem): void {
         lastSavedTime === undefined ||
         lastSavedTime === null ||
         lastSavedTime.toString() === '' ||
-        isNaN(new Date(lastSavedTime).getTime())
+        isNaN(new Date(lastSavedTime).getTime()) ||
+        lastSavedTime < 0
     ) {
         lastSavedStatus.text = '$(sync) No saves'
         lastSavedStatus.tooltip = 'Start tracking to collect metrics'

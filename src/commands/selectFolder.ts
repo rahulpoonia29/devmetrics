@@ -31,17 +31,16 @@ export default async function selectFolder() {
         return
     }
 
-    const folderName = basename(folder[0].fsPath)
     await workspace
         .getConfiguration()
         .update(
             'devmetrics.projectFolderPath',
-            folderName,
+            folder[0].fsPath,
             ConfigurationTarget.Global
         )
 
     await window.showInformationMessage('Project folder has been updated.', {
         modal: false,
-        detail: `Development metrics will now be tracked for: ${folderName}`,
+        detail: `Development metrics will now be tracked for: ${basename(folder[0].fsPath)}`,
     })
 }

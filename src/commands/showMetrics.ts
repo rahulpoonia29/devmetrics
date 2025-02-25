@@ -7,7 +7,7 @@ import {
     workspace,
 } from 'vscode'
 import getTimeLine from '../lib/generateTimelineHTML'
-import { MetricsDatabase } from '../lib/MetricsDatabase'
+import { MetricsDatabase } from '../DB/MetricsDatabase'
 
 export default async function showMetrics(context: ExtensionContext) {
     const projectFolderPath = workspace
