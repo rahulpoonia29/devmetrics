@@ -2,9 +2,8 @@ import * as crypto from 'crypto'
 import * as path from 'path'
 import { GitError } from 'simple-git'
 import { ConfigurationTarget, window, workspace } from 'vscode'
-import { CodeChangeMetrics } from '../types/Metrics'
-import { GitChangeRecorder } from '../lib/GitChangeRecorder'
-import { MetricsDatabase } from '../lib/MetricsDatabase'
+import { MetricsDatabase } from '../DB/MetricsDatabase'
+import { GitChangeRecorder } from '../services/git/GitSnapshotManager'
 
 export class DevelopmentActivityMonitor {
     private metricsDatabase: MetricsDatabase
@@ -89,15 +88,7 @@ export class DevelopmentActivityMonitor {
                 return
             }
 
-            const diffSummaryMessage = `Changed ${changes.summary.filesChanged} files with ${changes.summary.insertions} insertions and ${changes.summary.deletions} deletions`
-            const metrics: CodeChangeMetrics = {
-                ...changes,
-                diffSummaryMessage,
-                startTime: this.sessionStartTime,
-                endTime: Date.now(),
-            }
-
-            await this.metricsDatabase.saveMetrics(metrics)
+            await this.metricsDatabase.saveMetrics(changes)
 
             window.showInformationMessage('Saved code change metrics.')
         } catch (error: unknown) {
