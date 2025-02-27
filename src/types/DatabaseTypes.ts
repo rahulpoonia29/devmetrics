@@ -33,7 +33,7 @@ export interface DbLineChange extends LokiObj {
 export interface DbMetricsRecord extends LokiObj {
     id: string
     project_name: string
-    metrics: CodeChanges // Store the entire CodeChanges object
+    metrics: CodeChanges
     timestamp: number
 }
 

@@ -1,15 +1,10 @@
+import { AnyFileChange } from 'parse-git-diff'
 import { AnyLineChange, ChunkRange } from 'parse-git-diff'
-
-export interface GitDiffSummary {
-    filesChanged: number
-    insertions: number
-    deletions: number
-}
 
 export interface FileChange {
     filePath: string
     oldFilePath?: string // For renamed files
-    changeType: 'DeletedFile' | 'ChangedFile' | 'AddedFile' | 'RenamedFile'
+    changeType: AnyFileChange['type']
     lineChanges: AnyLineChange[]
 
     // Basic metrics
@@ -27,14 +22,13 @@ export interface FileChange {
     isBinary: boolean
 
     // Chunk information
-    chunks: {
-        count: number // Number of change chunks
-        averageSize: number // Average chunk size
-        ranges: ChunkRange[] // Store actual chunk ranges
-    }
+    chunkRanges: ChunkRange[]
 }
 
 export interface CodeChanges {
-    summary: GitDiffSummary
+    summary: string
+    filesChanged: number
+    insertions: number
+    deletions: number
     changes: FileChange[]
 }
