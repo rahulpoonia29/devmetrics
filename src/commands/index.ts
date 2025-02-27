@@ -4,7 +4,6 @@ import { DevelopmentActivityMonitor } from '../core/DevelopmentActivityMonitor'
 import { changeProjectFolder } from './changeProjectFolder'
 import { createProject } from './createProject'
 import { manageProjects } from './manageProjects'
-import { recordMetricsNow } from './projectCommands'
 import { renameProject } from './renameProject'
 import { toggleProjectTracking } from './toggleProjectTracking'
 import { viewProjectMetrics } from './viewProjectMetrics'
@@ -116,42 +115,6 @@ export async function registerCommands(
         }
     )
 
-    const recordMetricsNowCmd = vscode.commands.registerCommand(
-        'devmetrics.recordMetricsNow',
-        async () => {
-            // Get all projects
-            const projects = await db.getAllProjects()
-
-            if (projects.length === 0) {
-                vscode.window.showInformationMessage(
-                    'No projects available. Please create a project first.'
-                )
-                return
-            }
-
-            // Build project list
-            const projectItems = projects.map((p) => ({
-                label: p.name,
-                description: p.folder_path,
-                project: p,
-            }))
-
-            // Let user select a project
-            const selected = await vscode.window.showQuickPick(projectItems, {
-                placeHolder:
-                    'Select a project to record metrics for immediately',
-                title: 'Record Metrics Now',
-            })
-
-            if (!selected) {
-                return // User cancelled
-            }
-
-            const projectName = selected.project.name
-            recordMetricsNow(projectName, monitors)
-        }
-    )
-
     const viewProjectMetricsCmd = vscode.commands.registerCommand(
         'devmetrics.viewProjectMetrics',
         async () => {
@@ -194,7 +157,6 @@ export async function registerCommands(
         changeProjectFolderCmd,
         startTrackingCmd,
         stopTrackingCmd,
-        recordMetricsNowCmd,
         viewProjectMetricsCmd,
     ]
 }

@@ -33,18 +33,6 @@
                 "title": "DevMetrics: Change Project Folder"
             },
             {
-                "command": "devmetrics.startTracking",
-                "title": "DevMetrics: Start Tracking Project"
-            },
-            {
-                "command": "devmetrics.stopTracking",
-                "title": "DevMetrics: Stop Tracking Project"
-            },
-            {
-                "command": "devmetrics.recordMetricsNow",
-                "title": "DevMetrics: Record Metrics Now"
-            },
-            {
                 "command": "devmetrics.viewProjectMetrics",
                 "title": "DevMetrics: View Project Metrics"
             }

@@ -2,7 +2,6 @@ import path from 'path'
 import * as vscode from 'vscode'
 import { DevelopmentActivityMonitor } from '../core/DevelopmentActivityMonitor'
 import { MetricsDatabase } from '../DB/MetricsDatabase'
-import { activateProject } from './activateProject'
 import { toggleProjectTracking } from './toggleProjectTracking'
 
 export async function createProject(
@@ -31,21 +30,10 @@ export async function createProject(
     const existingProject = projects.find((p) => p.folder_path === folderPath)
 
     if (existingProject) {
-        const action = await vscode.window.showInformationMessage(
-            `A project already exists for this folder: ${existingProject.name}`,
-            'Switch to Project',
-            'Cancel'
+        await vscode.window.showInformationMessage(
+            `A project already exists for this folder: ${existingProject.name}`
         )
 
-        if (action === 'Switch to Project') {
-            // Navigate to the existing project
-            await activateProject(
-                existingProject.name,
-                db,
-                monitors,
-                globalStoragePath
-            )
-        }
         return
     }
 
