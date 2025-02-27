@@ -7,24 +7,8 @@ import {
 } from 'vscode'
 import { MetricsDatabase } from '../../DB/MetricsDatabase'
 
-// Simplified color palette - only keeping essential status colors
-const statusColorActive = '#4ec9b0;'
-const statusColorInactive = '#f48771;'
-
-const footerBackgroundColor = 'background-color:#2d2d2d;'
-const footerTextColor = 'color:#3794ff;' // VS Code theme blue
-const footerPadding = 'padding:8px;'
-const footerMarginTop = 'margin-top:10px;'
-const footerBorderRadius = 'border-radius:3px;'
-const footerTextAlign = 'text-align:center;'
-
-// Empty state styles
-const createProjectButtonBackgroundColor = 'background-color:#333333;'
-const createProjectButtonTextColor = 'color:#3794ff;' // VS Code theme blue
-const createProjectButtonPadding = 'padding:8px;'
-const createProjectButtonBorderRadius = 'border-radius:3px;'
-const createProjectButtonMarginTop = 'margin-top:5px;'
-const createProjectButtonFontWeight = 'font-weight:bold;'
+const COLOR_ACTIVE = '#4ec9b0;'
+const COLOR_INACTIVE = '#f48771;'
 
 export const projectsStatus = window.createStatusBarItem(
     StatusBarAlignment.Right,
@@ -35,101 +19,76 @@ export async function updateProjectsStatus(
     statusItem: StatusBarItem,
     db: MetricsDatabase
 ): Promise<void> {
-    // Get all projects
     const projects = await db.getAllProjects()
     const activeProjects = projects.filter((project) => project.is_tracking)
 
-    if (projects.length === 0) {
-        // No projects exist
-        statusItem.text = '$(info) DevMetrics'
-        statusItem.backgroundColor = new ThemeColor(
-            'statusBarItem.warningBackground'
-        )
+    statusItem.text = getStatusText(activeProjects.length, projects.length)
+    statusItem.backgroundColor = getStatusColor(activeProjects.length)
+    statusItem.tooltip = createTooltip(projects)
+    statusItem.command =
+        projects.length === 0
+            ? 'devmetrics.createProject'
+            : 'devmetrics.manageProjects'
+}
 
-        const tooltip = new MarkdownString()
-        tooltip.supportHtml = true
-        tooltip.isTrusted = true
+function getStatusText(activeCount: number, totalCount: number): string {
+    const icon = activeCount > 0 ? '$(radio-tower)' : '$(circle-slash)'
+    return `${icon} DevMetrics: ${activeCount}/${totalCount}`
+}
 
-        // Using mostly Markdown with minimal HTML
-        tooltip.appendMarkdown(`## DevMetrics\n\n`)
-        tooltip.appendMarkdown(`No projects created yet.\n\n`)
+function getStatusColor(activeCount: number): ThemeColor | undefined {
+    return activeCount > 0
+        ? new ThemeColor('statusBarItem.prominentBackground')
+        : undefined
+}
 
-        // Using command links for better interactivity
-        tooltip.appendMarkdown(
-            `<div style="${createProjectButtonBackgroundColor}${createProjectButtonPadding}${footerTextAlign}${createProjectButtonBorderRadius}${createProjectButtonMarginTop}">`
-        )
-        tooltip.appendMarkdown(
-            `<span style="${createProjectButtonTextColor}${createProjectButtonFontWeight}">+</span> `
-        )
-        tooltip.appendMarkdown(
-            `<span style="${createProjectButtonTextColor}">[Create a project](command:devmetrics.createProject)</span>`
-        )
-        tooltip.appendMarkdown('</div>')
-
-        statusItem.tooltip = tooltip
-        statusItem.command = 'devmetrics.createProject'
-        return
-    }
-
-    // Status bar text
-    const icon =
-        activeProjects.length > 0 ? '$(radio-tower)' : '$(circle-slash)'
-    const activeColor =
-        activeProjects.length > 0
-            ? new ThemeColor('statusBarItem.prominentBackground')
-            : undefined
-
-    statusItem.text = `${icon} DevMetrics: ${activeProjects.length}/${projects.length}`
-    statusItem.backgroundColor = activeColor
-
-    // Create tooltip with Markdown
+function createTooltip(projects: any[]): MarkdownString {
     const tooltip = new MarkdownString()
     tooltip.supportHtml = true
-    tooltip.isTrusted = true // Allow command links and keep tooltip visible when hovering
+    tooltip.isTrusted = true
+    tooltip.supportThemeIcons = true
 
-    // Header in Markdown
-    tooltip.appendMarkdown(`## DevMetrics Projects\n\n`)
+    if (projects.length === 0) {
+        tooltip.appendMarkdown(`## DevMetrics\n\n`)
+        tooltip.appendMarkdown(`No projects created yet.\n\n`)
+        tooltip.appendMarkdown(
+            `[$(add) Create a project](command:devmetrics.createProject)`
+        )
+    } else {
+        tooltip.appendMarkdown(`## DevMetrics Projects\n\n`)
+        tooltip.appendMarkdown(
+            `| <th style="width: 40%;">Project</th> | <th style="width: 30%;">Status</th> | <th style="width: 30%;">Last Activity</th> |\n` // Width on TH (header)
+        )
+        tooltip.appendMarkdown(
+            `| :-------------------------------- | :----------------------------: | -----------------------: |\n`
+        )
 
-    // Create a pure Markdown table with wider columns (using more spaces in header)
-    tooltip.appendMarkdown(
-        `| Project                | Status          | Last Activity     |\n`
-    )
-    tooltip.appendMarkdown(
-        `| ---------------------- | :-------------: | ----------------: |\n`
-    )
+        for (const project of projects) {
+            const statusText = project.is_tracking ? 'Active' : 'Inactive'
+            const statusIcon = project.is_tracking
+                ? '$(check)'
+                : '$(circle-slash)'
+            const statusHtml = project.is_tracking
+                ? `<span style="color:${COLOR_ACTIVE}">${statusIcon} ${statusText}</span>`
+                : `<span style="color:${COLOR_INACTIVE}">${statusIcon} ${statusText}</span>`
+            const lastSaved =
+                project.last_saved_time && project.last_saved_time > 0
+                    ? getTimeAgo(new Date(project.last_saved_time))
+                    : 'No data'
+            const projectNameCell = `**${project.name}**`
 
-    // Add table rows
-    for (const project of projects) {
-        const statusText = project.is_tracking ? 'Active' : 'Inactive'
-        // Only use HTML for colored status text
-        const statusHtml = project.is_tracking
-            ? `<span style="color:${statusColorActive}">${statusText}</span>`
-            : `<span style="color:${statusColorInactive}">${statusText}</span>`
-
-        let lastSaved = 'No data'
-        if (project.last_saved_time && project.last_saved_time > 0) {
-            lastSaved = getTimeAgo(new Date(project.last_saved_time))
+            tooltip.appendMarkdown(
+                `| <td style="width: 40%;">${projectNameCell}</td> | <td style="width: 30%; text-align:center;">${statusHtml}</td> | <td style="width: 30%; text-align:left;">${lastSaved}</td> |\n` // Width on TD (data cells) + alignment
+            )
         }
 
-        // Pad content with spaces to maintain column width
+        tooltip.appendMarkdown(`\n\n`)
         tooltip.appendMarkdown(
-            `| **${project.name}** | ${statusHtml.padStart(16)} | ${lastSaved.padStart(16)} |\n`
+            `[$(gear) Manage Projects](command:devmetrics.manageProjects)`
         )
     }
 
-    tooltip.appendMarkdown(`\n\n`)
-
-    // Footer with action hint - using command links for better interactivity
-    tooltip.appendMarkdown(
-        `<div style="${footerMarginTop}${footerTextAlign}${footerPadding}${footerBackgroundColor}${footerBorderRadius}">`
-    )
-    tooltip.appendMarkdown(
-        `<span style="${footerTextColor}">Click to manage projects</span>`
-    )
-    tooltip.appendMarkdown('</div>')
-
-    statusItem.tooltip = tooltip
-    statusItem.command = 'devmetrics.manageProjects'
+    return tooltip
 }
 
 function getTimeAgo(date: Date): string {
