@@ -391,7 +391,7 @@ export class MetricsDatabase {
             }
 
             // 1. Insert metrics record
-            const metricsRecord = this.metricsRecords.insert({
+            this.metricsRecords.insert({
                 id: metricsRecordId,
                 project_name: projectName,
                 metrics: metrics, // Store the entire CodeChanges object

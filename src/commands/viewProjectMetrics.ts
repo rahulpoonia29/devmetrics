@@ -5,6 +5,15 @@ export async function viewProjectMetrics(
     projectName: string,
     db: MetricsDatabase
 ): Promise<void> {
+    const project = await db.getProject(projectName)
+    if (!project) {
+        vscode.window.showErrorMessage(`Project "${projectName}" not found`)
+        return
+    }
+
+    const metrics = await db.loadMetrics(projectName)
+    console.log('Metrics: ', metrics)
+
     // TODO: Implement metrics viewing
     // This would typically:
     // 1. Load metrics from database
