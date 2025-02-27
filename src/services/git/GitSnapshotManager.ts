@@ -4,7 +4,7 @@ import * as path from 'path'
 
 import parseGitDiff from 'parse-git-diff'
 import simpleGit, { GitError, SimpleGit } from 'simple-git'
-import { CodeChanges, GitDiffSummary } from '../../types/GitTypes'
+import { CodeChanges } from '../../types/GitTypes'
 import { processFileChange } from './GitDiffParser'
 
 /**
@@ -145,21 +145,19 @@ export class GitSnapshotManager {
         const diffSummary = await this.git.diffSummary([oldCommit, newCommit])
         const diffObject = parseGitDiff(diffString)
 
-        const summary: GitDiffSummary = {
-            filesChanged: diffSummary.files.length,
-            insertions: diffSummary.insertions,
-            deletions: diffSummary.deletions,
-        }
-
         // Process each file change from the diffObject
         const changes = diffObject.files.map((fileChange) =>
             processFileChange(fileChange)
         )
+        const summary = `Changes between ${oldCommit} and ${newCommit}`
 
         return {
             summary,
+            filesChanged: diffSummary.files.length,
+            insertions: diffSummary.insertions,
+            deletions: diffSummary.deletions,
             changes,
-        }
+        } satisfies CodeChanges
     }
 
     private handleGitError(error: unknown, contextMessage: string): never {
@@ -178,6 +176,3 @@ export class GitSnapshotManager {
         )
     }
 }
-
-// Export with old name for backward compatibility
-export { GitSnapshotManager as GitChangeRecorder }

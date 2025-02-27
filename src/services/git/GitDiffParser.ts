@@ -115,11 +115,6 @@ export function processFileChange(fileChange: AnyFileChange): FileChange {
         originalLinesCount,
         changeRatio,
         isBinary,
-        chunks: {
-            count: chunks.length,
-            averageSize:
-                chunks.length > 0 ? lineChanges.length / chunks.length : 0,
-            ranges: chunkRanges,
-        },
+        chunkRanges,
     }
 }
