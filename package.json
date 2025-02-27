@@ -3,7 +3,7 @@
     "publisher": "Rahul",
     "displayName": "DevMetrics",
     "description": "Gain insights into your coding activity directly within VS Code! This extension automatically tracks basic code metrics like lines of code added and removed within your project folders.  View session summaries in the Output Panel to monitor your coding progress locally.  Start understanding your coding habits today!",
-    "version": "0.0.1",
+    "version": "0.0.2",
     "engines": {
         "vscode": "^1.97.0"
     },
@@ -17,44 +17,41 @@
     "contributes": {
         "commands": [
             {
-                "command": "devmetrics.selectFolder",
-                "title": "Select Folder"
+                "command": "devmetrics.createProject",
+                "title": "DevMetrics: Create New Project"
+            },
+            {
+                "command": "devmetrics.manageProjects",
+                "title": "DevMetrics: Manage Projects"
+            },
+            {
+                "command": "devmetrics.renameProject",
+                "title": "DevMetrics: Rename Project"
+            },
+            {
+                "command": "devmetrics.changeProjectFolder",
+                "title": "DevMetrics: Change Project Folder"
             },
             {
                 "command": "devmetrics.startTracking",
-                "title": "Start Tracking"
+                "title": "DevMetrics: Start Tracking Project"
             },
             {
                 "command": "devmetrics.stopTracking",
-                "title": "Stop Tracking"
+                "title": "DevMetrics: Stop Tracking Project"
             },
             {
-                "command": "devmetrics.statusBarClicked",
-                "title": "Status Bar Clicked"
+                "command": "devmetrics.recordMetricsNow",
+                "title": "DevMetrics: Record Metrics Now"
             },
             {
-                "command": "devmetrics.showMetrics",
-                "title": "Show Metrics"
+                "command": "devmetrics.viewProjectMetrics",
+                "title": "DevMetrics: View Project Metrics"
             }
         ],
         "configuration": {
             "title": "DevMetrics",
             "properties": {
-                "devmetrics.projectFolderPath": {
-                    "type": "string",
-                    "default": "",
-                    "description": "The project folder to track metrics for."
-                },
-                "devmetrics.trackingEnabled": {
-                    "type": "boolean",
-                    "default": false,
-                    "description": "Whether or not to track metrics for the project folder."
-                },
-                "devmetrics.lastSavedTime": {
-                    "type": "number",
-                    "default": -100,
-                    "description": "The last time the metrics were saved."
-                },
                 "devmetrics.analysisIntervalMinutes": {
                     "type": "number",
                     "default": 30,
@@ -71,6 +68,24 @@
                     "description": "Glob patterns for paths to exclude from tracking"
                 }
             }
+        },
+        "viewsContainers": {
+            "activitybar": [
+                {
+                    "id": "devmetricsContainer",
+                    "title": "DevMetrics",
+                    "icon": "$(graph-line)"
+                }
+            ]
+        },
+        "views": {
+            "devmetricsContainer": [
+                {
+                    "type": "webview",
+                    "id": "devmetrics.metricsView",
+                    "name": "DevMetrics"
+                }
+            ]
         }
     },
     "scripts": {
@@ -93,14 +108,13 @@
     },
     "devDependencies": {
         "@types/fs-extra": "^11.0.4",
-        "@types/mocha": "^10.0.10",
+        "@types/lokijs": "^1.5.14",
         "@types/node": "22.x",
         "@types/uuid": "^10.0.0",
         "@types/vscode": "^1.97.0",
         "@typescript-eslint/eslint-plugin": "^8.24.1",
         "@typescript-eslint/parser": "^8.24.1",
         "@vscode/test-cli": "^0.0.10",
-        "@vscode/test-electron": "^2.4.1",
         "esbuild": "^0.25.0",
         "eslint": "^9.20.1",
         "eslint-config-prettier": "^10.0.1",
@@ -112,6 +126,7 @@
     },
     "dependencies": {
         "fs-extra": "^11.3.0",
+        "lokijs": "^1.5.12",
         "parse-git-diff": "^0.0.17",
         "simple-git": "^3.27.0",
         "uuid": "^9.0.1"
