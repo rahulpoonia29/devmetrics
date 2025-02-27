@@ -1,109 +1,67 @@
 import * as vscode from 'vscode'
-import {
-    disableTracking,
-    enableTracking,
-    selectFolder,
-    showMetrics,
-} from './commands'
+import { registerCommands } from './commands'
 import { DevelopmentActivityMonitor } from './core/DevelopmentActivityMonitor'
+import { MetricsDatabase } from './DB/MetricsDatabase'
 import { StatusBarItems, statusBarActions } from './statusBar/index'
 
 export async function activate(context: vscode.ExtensionContext) {
-    let developmentActivityMonitor: DevelopmentActivityMonitor | null = null
+    // Set up the database
+    const DB = new MetricsDatabase(context.globalStorageUri)
+    await DB.initializeDb()
 
-    const selectFolderDisposable = vscode.commands.registerCommand(
-        'devmetrics.selectFolder',
-        async () => {
-            await selectFolder()
-        }
-    )
+    const projects = await DB.getAllProjects()
 
-    const enableTrackingDisposable = vscode.commands.registerCommand(
-        'devmetrics.startTracking',
-        async () => {
-            const result = await enableTracking(
-                context,
-                developmentActivityMonitor
+    // Map to store monitor instances for each project
+    const monitorInstances = new Map<string, DevelopmentActivityMonitor>()
+    projects.forEach((project) => {
+        const development_activity_monitor_instance =
+            new DevelopmentActivityMonitor(
+                DB,
+                project.name,
+                project.folder_path,
+                context.globalStorageUri.fsPath
             )
-            if (result) {
-                developmentActivityMonitor = result
-            }
-        }
-    )
 
-    const disableTrackingDisposable = vscode.commands.registerCommand(
-        'devmetrics.stopTracking',
-        async () => {
-            if (developmentActivityMonitor) {
-                await disableTracking(developmentActivityMonitor)
-                developmentActivityMonitor = null
-            } else {
-                vscode.window.showInformationMessage(
-                    'Tracking is not currently active.',
-                    {
-                        detail: 'You can enable it to start tracking your coding activity.',
-                    }
-                )
-            }
-        }
-    )
+        // Start tracking for all the projects
+        development_activity_monitor_instance.startTracking()
 
-    const showMetricsDisposable = vscode.commands.registerCommand(
-        'devmetrics.showMetrics',
-        async () => {
-            await showMetrics(context)
-        }
-    )
-
-    // Initialize status bar items
-    statusBarActions.updateTrackingStatus(StatusBarItems.trackingStatus)
-    statusBarActions.updateLastSavedTime(StatusBarItems.lastSavedTime)
-    StatusBarItems.trackingStatus.show()
-    StatusBarItems.lastSavedTime.show()
-
-    // Update status bar items on configuration change
-    vscode.workspace.onDidChangeConfiguration((event) => {
-        if (event.affectsConfiguration('devmetrics.trackingEnabled')) {
-            statusBarActions.updateTrackingStatus(StatusBarItems.trackingStatus)
-        }
-        if (event.affectsConfiguration('devmetrics.lastSavedTime')) {
-            statusBarActions.updateLastSavedTime(StatusBarItems.lastSavedTime)
-        }
+        monitorInstances.set(
+            project.name,
+            development_activity_monitor_instance
+        )
     })
 
-    // Update status bar items on workspace change
-    vscode.workspace.onDidChangeWorkspaceFolders(() => {
-        statusBarActions.updateTrackingStatus(StatusBarItems.trackingStatus)
-        statusBarActions.updateLastSavedTime(StatusBarItems.lastSavedTime)
-    })
-
-    // Start tracking on startup if enabled in settings
-    if (
-        vscode.workspace
-            .getConfiguration()
-            .get(
-                'devmetrics.trackingEnabled',
-                vscode.ConfigurationTarget.Global
-            )
+    // Register commands
+    const commandDisposables = await registerCommands(
+        DB,
+        monitorInstances,
+        context.globalStorageUri.fsPath
     )
-        vscode.commands.executeCommand('devmetrics.startTracking')
 
+    // Initialize status bar with project status indicator
+    await statusBarActions.updateProjectsStatus(
+        StatusBarItems.projectsStatus,
+        DB
+    )
+    StatusBarItems.projectsStatus.show()
+
+    // Set up periodic status bar updates
+    const statusUpdateInterval = setInterval(async () => {
+        await statusBarActions.updateProjectsStatus(
+            StatusBarItems.projectsStatus,
+            DB
+        )
+    }, 60000 * 5) // Update every 5 minutes
+
+    // Add all disposables to context
     context.subscriptions.push(
-        // Status bar Items
-        StatusBarItems.trackingStatus,
-        StatusBarItems.lastSavedTime,
-        // Disposables
-        selectFolderDisposable,
-        enableTrackingDisposable,
-        disableTrackingDisposable,
-        showMetricsDisposable,
-        {
-            dispose: async () => {
-                if (developmentActivityMonitor) {
-                    // Gather and save metrics before deactivating
-                    await developmentActivityMonitor.stopTracking()
-                }
-            },
-        }
+        ...commandDisposables,
+        StatusBarItems.projectsStatus,
+        { dispose: () => clearInterval(statusUpdateInterval) },
+        { dispose: async () => await DB.close() }
     )
+}
+
+export function deactivate() {
+    // Cleanup will be handled by the disposable in the activate function
 }
