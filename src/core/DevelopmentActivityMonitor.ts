@@ -3,16 +3,19 @@ import * as path from 'path'
 import { GitError } from 'simple-git'
 import { ConfigurationTarget, window, workspace } from 'vscode'
 import { MetricsDatabase } from '../DB/MetricsDatabase'
-import { GitChangeRecorder } from '../services/git/GitSnapshotManager'
+import { GitSnapshotManager } from '../services/git/GitSnapshotManager'
 
 export class DevelopmentActivityMonitor {
-    private metricsDatabase: MetricsDatabase
-    private readonly changeRecorder: GitChangeRecorder
+    private readonly gitSnapshotManager: GitSnapshotManager
     private analysisTimer: NodeJS.Timeout | null = null
     private sessionStartTime: number = 0
     private readonly checkIntervalMs = 60000 // 1 minute
-
-    constructor(projectFolderPath: string, globalStorageFolderPath: string) {
+    constructor(
+        private metricsDatabase: MetricsDatabase,
+        private projectName: string,
+        projectFolderPath: string,
+        globalStorageFolderPath: string
+    ) {
         const projectHash = crypto
             .createHash('md5')
             .update(projectFolderPath)
@@ -23,19 +26,15 @@ export class DevelopmentActivityMonitor {
             'tracked_projects',
             projectHash
         )
-        this.changeRecorder = new GitChangeRecorder(
+        this.gitSnapshotManager = new GitSnapshotManager(
             projectFolderPath,
             trackedRepositoryFolder
-        )
-        this.metricsDatabase = new MetricsDatabase(
-            globalStorageFolderPath,
-            projectHash
         )
     }
 
     public async startTracking(): Promise<void> {
         try {
-            await this.changeRecorder.initializeRepository()
+            await this.gitSnapshotManager.initializeRepository()
             this.sessionStartTime = Date.now()
             this.beginChangeAnalysis()
         } catch (error: unknown) {
@@ -51,6 +50,13 @@ export class DevelopmentActivityMonitor {
         }
 
         this.analysisTimer = setInterval(async () => {
+            // *Check if the project is still being tracked
+            const project = await this.metricsDatabase.getProject(
+                this.projectName
+            )
+            if (!project) return
+            if (!project.is_tracking) return
+
             const analysisIntervalMilliseconds =
                 this.getConfiguredIntervalInMilliseconds()
 
@@ -66,9 +72,9 @@ export class DevelopmentActivityMonitor {
     }
 
     private getConfiguredIntervalInMilliseconds(): number {
-        const analysisIntervalMinutes: number = workspace
+        const analysisIntervalMinutes = workspace
             .getConfiguration()
-            .get('devmetrics.analysisIntervalMinutes', 15) as number
+            .get<number>('devmetrics.analysisIntervalMinutes', 15)
         return analysisIntervalMinutes * 60 * 1000
     }
 
@@ -82,13 +88,13 @@ export class DevelopmentActivityMonitor {
                     ConfigurationTarget.Global
                 )
 
-            const changes = await this.changeRecorder.captureChanges()
+            const changes = await this.gitSnapshotManager.captureChanges()
 
-            if (!changes || changes.summary.filesChanged === 0) {
+            if (!changes || changes.filesChanged === 0) {
                 return
             }
 
-            await this.metricsDatabase.saveMetrics(changes)
+            await this.metricsDatabase.saveMetrics(changes, this.projectName)
 
             window.showInformationMessage('Saved code change metrics.')
         } catch (error: unknown) {
