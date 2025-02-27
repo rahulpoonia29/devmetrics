@@ -1,5 +1,6 @@
 import { AnyFileChange } from 'parse-git-diff'
 import { CodeChanges } from './GitTypes'
+import { Collection } from 'lokijs'
 
 export interface DbChunkRange extends LokiObj {
     file_change_id: number
