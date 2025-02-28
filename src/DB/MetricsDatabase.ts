@@ -397,6 +397,10 @@ export class MetricsDatabase {
                 metrics: metrics, // Store the entire CodeChanges object
                 timestamp,
             })
+            this.projects.update({
+                ...project,
+                last_saved_time: timestamp,
+            })
 
             await this.persistToDisk()
 
