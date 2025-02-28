@@ -95,6 +95,12 @@
                     "id": "devmetrics.projectsView",
                     "name": "Projects",
                     "type": "tree"
+                },
+                {
+                    "id": "devmetrics.metricsView",
+                    "name": "Project Metrics",
+                    "type": "tree",
+                    "when": "config.devmetrics.showMetricsView == true"
                 }
             ]
         },
@@ -108,6 +114,11 @@
                 {
                     "command": "devmetrics.refreshData",
                     "when": "view == devmetrics.projectsView",
+                    "group": "navigation"
+                },
+                {
+                    "command": "devmetrics.refreshData",
+                    "when": "view == devmetrics.metricsView",
                     "group": "navigation"
                 }
             ],

@@ -1,10 +1,12 @@
 import * as vscode from 'vscode'
 import { registerCommands } from './commands'
-import { refreshData } from './commands/refreshData'
 import { DevelopmentActivityMonitor } from './core/DevelopmentActivityMonitor'
 import { MetricsDatabase } from './DB/MetricsDatabase'
 import { StatusBarItems, statusBarActions } from './statusBar/index'
 import { ProjectsTreeProvider } from './views/ProjectsTreeProvider'
+import { MetricsTreeProvider } from './views/MetricsTreeProvider'
+import { MetricsViewProvider } from './webviews/metrics'
+import { refreshData } from './commands/refreshData'
 
 export async function activate(context: vscode.ExtensionContext) {
     // Set up the database
@@ -44,10 +46,29 @@ export async function activate(context: vscode.ExtensionContext) {
         }
     )
 
+    // Initialize metrics tree view
+    const metricsProvider = new MetricsTreeProvider(DB)
+    const metricsTreeView = vscode.window.createTreeView(
+        'devmetrics.metricsView',
+        {
+            treeDataProvider: metricsProvider,
+            showCollapseAll: true,
+        }
+    )
+
+    // Register the MetricsViewProvider for webview
+    const metricsViewProvider = new MetricsViewProvider(context, DB)
+    context.subscriptions.push(
+        vscode.window.registerWebviewViewProvider(
+            MetricsViewProvider.viewType,
+            metricsViewProvider
+        )
+    )
+
     // Register the refresh command
     const refreshCommand = vscode.commands.registerCommand(
         'devmetrics.refreshData',
-        () => refreshData(projectsProvider, DB)
+        () => refreshData(projectsProvider, DB, metricsProvider)
     )
     context.subscriptions.push(refreshCommand)
 
@@ -80,11 +101,12 @@ export async function activate(context: vscode.ExtensionContext) {
         { dispose: () => clearInterval(statusUpdateInterval) },
         { dispose: async () => await DB.close() },
         projectsTreeView,
+        metricsTreeView,
         {
-            dispose: async () => {
+            dispose: () => {
                 // Dispose all active monitors
                 for (const monitor of monitorInstances.values()) {
-                    await monitor.stopTracking()
+                    // monitor.stopMonitoring()
                 }
             },
         }
