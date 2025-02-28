@@ -8,7 +8,7 @@
         "url": "https://github.com/rahulpoonia29/devmetrics.git"
     },
     "description": "Gain insights into your coding activity directly within VS Code! This extension automatically tracks basic code metrics like lines of code added and removed within your project folders.  View session summaries in the Output Panel to monitor your coding progress locally.  Start understanding your coding habits today!",
-    "version": "0.0.1",
+    "version": "0.1.0",
     "engines": {
         "vscode": "^1.97.0"
     },
