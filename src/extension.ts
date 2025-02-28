@@ -1,8 +1,10 @@
 import * as vscode from 'vscode'
 import { registerCommands } from './commands'
+import { refreshData } from './commands/refreshData'
 import { DevelopmentActivityMonitor } from './core/DevelopmentActivityMonitor'
 import { MetricsDatabase } from './DB/MetricsDatabase'
 import { StatusBarItems, statusBarActions } from './statusBar/index'
+import { ProjectsTreeProvider } from './views/ProjectsTreeProvider'
 
 export async function activate(context: vscode.ExtensionContext) {
     // Set up the database
@@ -13,6 +15,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
     // Map to store monitor instances for each project
     const monitorInstances = new Map<string, DevelopmentActivityMonitor>()
+
     projects.forEach((project) => {
         const development_activity_monitor_instance =
             new DevelopmentActivityMonitor(
@@ -31,7 +34,24 @@ export async function activate(context: vscode.ExtensionContext) {
         )
     })
 
-    // Register commands
+    // Initialize project tree view
+    const projectsProvider = new ProjectsTreeProvider(DB)
+    const projectsTreeView = vscode.window.createTreeView(
+        'devmetrics.projectsView',
+        {
+            treeDataProvider: projectsProvider,
+            showCollapseAll: false,
+        }
+    )
+
+    // Register the refresh command
+    const refreshCommand = vscode.commands.registerCommand(
+        'devmetrics.refreshData',
+        () => refreshData(projectsProvider, DB)
+    )
+    context.subscriptions.push(refreshCommand)
+
+    // Register other commands
     const commandDisposables = await registerCommands(
         DB,
         monitorInstances,
@@ -58,7 +78,16 @@ export async function activate(context: vscode.ExtensionContext) {
         ...commandDisposables,
         StatusBarItems.projectsStatus,
         { dispose: () => clearInterval(statusUpdateInterval) },
-        { dispose: async () => await DB.close() }
+        { dispose: async () => await DB.close() },
+        projectsTreeView,
+        {
+            dispose: async () => {
+                // Dispose all active monitors
+                for (const monitor of monitorInstances.values()) {
+                    await monitor.stopTracking()
+                }
+            },
+        }
     )
 }
 

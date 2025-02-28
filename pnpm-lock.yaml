@@ -29,6 +29,9 @@ importers:
             '@types/lokijs':
                 specifier: ^1.5.14
                 version: 1.5.14
+            '@types/mocha':
+                specifier: ^10.0.10
+                version: 10.0.10
             '@types/node':
                 specifier: 22.x
                 version: 22.13.4
