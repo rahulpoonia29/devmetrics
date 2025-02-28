@@ -87,3 +87,11 @@ export interface Project {
     is_tracking: boolean
     last_saved_time: number
 }
+
+export interface MetricSummary {
+    project_name: string
+    lines_added: number
+    lines_removed: number
+    files_modified: number
+    date_range?: string
+}
