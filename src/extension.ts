@@ -1,12 +1,11 @@
 import * as vscode from 'vscode'
 import { registerCommands } from './commands'
+import { refreshData } from './commands/refreshData'
 import { DevelopmentActivityMonitor } from './core/DevelopmentActivityMonitor'
 import { MetricsDatabase } from './DB/MetricsDatabase'
 import { StatusBarItems, statusBarActions } from './statusBar/index'
-import { ProjectsTreeProvider } from './views/ProjectsTreeProvider'
 import { MetricsTreeProvider } from './views/MetricsTreeProvider'
-import { MetricsViewProvider } from './webviews/metrics'
-import { refreshData } from './commands/refreshData'
+import { ProjectsTreeProvider } from './views/ProjectsTreeProvider'
 
 export async function activate(context: vscode.ExtensionContext) {
     // Set up the database
@@ -56,15 +55,6 @@ export async function activate(context: vscode.ExtensionContext) {
         }
     )
 
-    // Register the MetricsViewProvider for webview
-    const metricsViewProvider = new MetricsViewProvider(context, DB)
-    context.subscriptions.push(
-        vscode.window.registerWebviewViewProvider(
-            MetricsViewProvider.viewType,
-            metricsViewProvider
-        )
-    )
-
     // Register the refresh command
     const refreshCommand = vscode.commands.registerCommand(
         'devmetrics.refreshData',
@@ -106,7 +96,7 @@ export async function activate(context: vscode.ExtensionContext) {
             dispose: () => {
                 // Dispose all active monitors
                 for (const monitor of monitorInstances.values()) {
-                    // monitor.stopMonitoring()
+                    monitor.stopTracking()
                 }
             },
         }
