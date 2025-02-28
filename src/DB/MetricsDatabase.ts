@@ -1,6 +1,5 @@
 import * as fs from 'fs'
 import Loki from 'lokijs'
-import { AnyLineChange } from 'parse-git-diff'
 import * as path from 'path'
 import { v4 as uuidv4 } from 'uuid'
 import { Uri } from 'vscode'
@@ -15,9 +14,10 @@ import {
     MetricsQueryOptions,
     MetricsRecord,
     MetricsStorageResult,
+    MetricSummary,
     Project,
 } from '../types/DatabaseTypes'
-import { CodeChanges, FileChange } from '../types/GitTypes'
+import { CodeChanges } from '../types/GitTypes'
 
 // Type guard to make sure $loki exists (used in filters)
 function hasLokiId<T extends LokiObj>(obj: T): obj is T & { $loki: number } {
@@ -291,36 +291,6 @@ export class MetricsDatabase {
         }
     }
 
-    public async updateProjectLastSavedTime(
-        projectName: string,
-        timestamp: number
-    ): Promise<void> {
-        this.checkInitialized()
-
-        try {
-            const project = this.projects.findOne({ name: projectName })
-            if (!project) {
-                throw new DatabaseError(
-                    `Project not found: ${projectName}`,
-                    'NOT_FOUND'
-                )
-            }
-
-            project.last_saved_time = timestamp
-            this.projects.update(project)
-            await this.persistToDisk()
-        } catch (error) {
-            if (error instanceof DatabaseError) {
-                throw error
-            }
-
-            throw new DatabaseError(
-                `Failed to update last saved time: ${error instanceof Error ? error.message : String(error)}`,
-                'UPDATE_FAILED'
-            )
-        }
-    }
-
     public async deleteProject(projectName: string): Promise<void> {
         this.checkInitialized()
 
@@ -397,9 +367,10 @@ export class MetricsDatabase {
                 metrics: metrics, // Store the entire CodeChanges object
                 timestamp,
             })
-            this.projects.update({
-                ...project,
-                last_saved_time: timestamp,
+
+            // 2. Update last saved time for the project
+            this.projects.findAndUpdate({ name: projectName }, (project) => {
+                project.last_saved_time = timestamp
             })
 
             await this.persistToDisk()
@@ -417,6 +388,43 @@ export class MetricsDatabase {
         }
     }
 
+    public async clearProjectMetrics(projectName: string): Promise<void> {
+        this.checkInitialized()
+
+        try {
+            // Check if project exists
+            const project = this.projects.findOne({ name: projectName })
+            if (!project) {
+                throw new DatabaseError(
+                    `Project not found: ${projectName}`,
+                    'NOT_FOUND'
+                )
+            }
+
+            // Find all metrics records for this project
+            const metricsToDelete = this.metricsRecords.find({
+                project_name: projectName,
+            })
+
+            // Delete all related data for each metrics record
+            for (const record of metricsToDelete) {
+                await this.deleteMetricsRecordCascade(record.id)
+            }
+
+            await this.persistToDisk()
+        } catch (error) {
+            if (error instanceof DatabaseError) {
+                throw error
+            }
+
+            throw new DatabaseError(
+                `Failed to clear metrics: ${error instanceof Error ? error.message : String(error)}`,
+                'CLEAR_FAILED'
+            )
+        }
+    }
+
+    // !To be used in future probably
     public async loadMetrics(
         projectName: string,
         options?: MetricsQueryOptions
@@ -477,134 +485,96 @@ export class MetricsDatabase {
         }
     }
 
-    private async populateFileChanges(
-        fileChanges: DbFileChange[]
-    ): Promise<FileChange[]> {
-        // Build populated file changes
-        return Promise.all(
-            fileChanges.map(async (fc) => {
-                // Get line changes and chunk ranges only if we have a valid LokiJS ID
-                if (!hasLokiId(fc)) {
-                    // Return FileChange with empty arrays if no LokiJS ID
-                    return {
-                        filePath: fc.file_path,
-                        oldFilePath: fc.old_file_path || undefined,
-                        changeType: fc.change_type,
-                        lineChanges: [],
-                        addedLinesCount: fc.added_lines_count,
-                        deletedLinesCount: fc.deleted_lines_count,
-                        modifiedLinesCount: fc.modified_lines_count,
-                        unchangedLinesCount: fc.unchanged_lines_count,
-                        totalLinesCount: fc.total_lines_count,
-                        originalLinesCount: fc.original_lines_count,
-                        changeRatio: fc.change_ratio,
-                        isBinary: fc.is_binary,
-                        chunkRanges: [],
-                    } satisfies FileChange
-                }
-
-                // Get line changes for this file change
-                const lineChanges = this.lineChanges.find({
-                    file_change_id: fc.$loki,
-                })
-
-                // Get chunk ranges for this file change
-                const chunkRanges = this.chunkRanges.find({
-                    file_change_id: fc.$loki,
-                })
-
-                // Map line changes to the expected type
-                const mappedLineChanges: AnyLineChange[] = lineChanges.map(
-                    (lc) => {
-                        switch (lc.change_type) {
-                            case 'AddedLine':
-                                return {
-                                    type: 'AddedLine',
-                                    content: lc.content,
-                                    lineAfter: lc.line_number ?? 0,
-                                }
-                            case 'DeletedLine':
-                                return {
-                                    type: 'DeletedLine',
-                                    content: lc.content,
-                                    lineBefore: lc.line_number ?? 0,
-                                }
-                            case 'UnchangedLine':
-                                return {
-                                    type: 'UnchangedLine',
-                                    content: lc.content,
-                                    lineBefore: lc.line_number ?? 0,
-                                    lineAfter: lc.line_number ?? 0,
-                                }
-                            case 'MessageLine':
-                            default:
-                                return {
-                                    type: 'MessageLine',
-                                    content: lc.content,
-                                }
-                        }
-                    }
-                )
-
-                // Map chunk ranges
-                const mappedChunkRanges = chunkRanges.map((cr) => ({
-                    start: cr.start_range,
-                    lines: cr.lines,
-                }))
-
-                // Create FileChange object
-                return {
-                    filePath: fc.file_path,
-                    oldFilePath: fc.old_file_path || undefined,
-                    changeType: fc.change_type,
-                    lineChanges: mappedLineChanges,
-                    addedLinesCount: fc.added_lines_count,
-                    deletedLinesCount: fc.deleted_lines_count,
-                    modifiedLinesCount: fc.modified_lines_count,
-                    unchangedLinesCount: fc.unchanged_lines_count,
-                    totalLinesCount: fc.total_lines_count,
-                    originalLinesCount: fc.original_lines_count,
-                    changeRatio: fc.change_ratio,
-                    isBinary: fc.is_binary,
-                    chunkRanges: mappedChunkRanges,
-                }
-            })
-        )
-    }
-
-    public async clearProjectMetrics(projectName: string): Promise<void> {
-        this.checkInitialized()
-
+    public async getMetricSummary(
+        projectName: string,
+        timeframe: 'today' | 'week' | 'month' | 'all' = 'all'
+    ): Promise<MetricSummary | null> {
         try {
-            // Check if project exists
-            const project = this.projects.findOne({ name: projectName })
+            // Find project
+            const project = await this.getProject(projectName)
+
             if (!project) {
-                throw new DatabaseError(
-                    `Project not found: ${projectName}`,
-                    'NOT_FOUND'
-                )
+                return null
             }
 
-            // Find all metrics records for this project
-            const metricsToDelete = this.metricsRecords.find({
-                project_name: projectName,
+            // Set up date filters based on timeframe
+            const endDate = new Date()
+            let startDate = new Date()
+
+            switch (timeframe) {
+                case 'today':
+                    // Set to beginning of today (midnight)
+                    startDate.setHours(0, 0, 0, 0)
+                    endDate.setHours(23, 59, 59, 999)
+                    break
+                case 'week':
+                    // Set to beginning of the week
+                    const dayOfWeek = startDate.getDay() // 0 = Sunday, 1 = Monday, etc.
+                    const diff = dayOfWeek === 0 ? 6 : dayOfWeek - 1
+                    startDate.setDate(startDate.getDate() - diff)
+                    startDate.setHours(0, 0, 0, 0)
+                    break
+                case 'month':
+                    // Set to beginning of current month
+                    startDate.setDate(1)
+                    startDate.setHours(0, 0, 0, 0)
+                    break
+                case 'all':
+                default:
+                    // No start date filter for all-time
+                    startDate = new Date(0) // Use a very old date
+                    break
+            }
+
+            const metrics = await this.loadMetrics(projectName, {
+                startDate: startDate,
+                endDate: endDate,
             })
 
-            // Delete all related data for each metrics record
-            for (const record of metricsToDelete) {
-                await this.deleteMetricsRecordCascade(record.id)
+            const dateRange =
+                timeframe === 'today'
+                    ? 'Today'
+                    : timeframe === 'week'
+                      ? 'This Week'
+                      : timeframe === 'month'
+                        ? 'This Month'
+                        : 'All Time'
+
+            if (!metrics || metrics.length === 0) {
+                return {
+                    project_name: project.name,
+                    lines_added: 0,
+                    lines_removed: 0,
+                    files_modified: 0,
+                    date_range: dateRange,
+                } satisfies MetricSummary
             }
 
-            await this.persistToDisk()
+            // Aggregate metric values
+            let totalLinesAdded = 0
+            let totalLinesRemoved = 0
+            let totalFilesModified = 0
+
+            metrics.forEach((record) => {
+                const data = record.data
+
+                if (data) {
+                    totalLinesAdded += data.insertions || 0
+                    totalLinesRemoved += data.deletions || 0
+                    totalFilesModified += data.filesChanged
+                }
+            })
+
+            return {
+                project_name: project.name,
+                lines_added: totalLinesAdded,
+                lines_removed: totalLinesRemoved,
+                files_modified: totalFilesModified,
+                date_range: dateRange,
+            }
         } catch (error) {
-            if (error instanceof DatabaseError) {
-                throw error
-            }
-
-            throw new DatabaseError(
-                `Failed to clear metrics: ${error instanceof Error ? error.message : String(error)}`,
-                'CLEAR_FAILED'
-            )
+            console.error('Error getting metric summary:', error)
+            return null
         }
     }
 }
