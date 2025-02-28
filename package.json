@@ -18,7 +18,13 @@
         "commands": [
             {
                 "command": "devmetrics.createProject",
-                "title": "DevMetrics: Create New Project"
+                "title": "DevMetrics: Create New Project",
+                "icon": "$(add)"
+            },
+            {
+                "command": "devmetrics.deleteProject",
+                "title": "DevMetrics: Delete Project",
+                "icon": "$(trashcan)"
             },
             {
                 "command": "devmetrics.manageProjects",
@@ -34,7 +40,24 @@
             },
             {
                 "command": "devmetrics.viewProjectMetrics",
-                "title": "DevMetrics: View Project Metrics"
+                "title": "DevMetrics: View Project Metrics",
+                "icon": "$(graph-line)"
+            },
+            {
+                "command": "devmetrics.startTracking",
+                "title": "DevMetrics: Start Tracking",
+                "icon": "$(play)"
+            },
+            {
+                "command": "devmetrics.stopTracking",
+                "title": "DevMetrics: Stop Tracking",
+                "icon": "$(stop)"
+            },
+            {
+                "command": "devmetrics.refreshData",
+                "title": "Refresh DevMetrics Data",
+                "category": "DevMetrics",
+                "icon": "$(refresh)"
             }
         ],
         "configuration": {
@@ -69,9 +92,55 @@
         "views": {
             "devmetricsContainer": [
                 {
-                    "type": "webview",
-                    "id": "devmetrics.metricsView",
-                    "name": "DevMetrics"
+                    "id": "devmetrics.projectsView",
+                    "name": "Projects",
+                    "type": "tree"
+                }
+            ]
+        },
+        "menus": {
+            "view/title": [
+                {
+                    "command": "devmetrics.createProject",
+                    "when": "view == devmetrics.projectsView",
+                    "group": "navigation"
+                },
+                {
+                    "command": "devmetrics.refreshData",
+                    "when": "view == devmetrics.projectsView",
+                    "group": "navigation"
+                }
+            ],
+            "view/item/context": [
+                {
+                    "command": "devmetrics.viewProjectMetrics",
+                    "when": "view == devmetrics.projectsView && viewItem =~ /project/",
+                    "group": "inline"
+                },
+                {
+                    "command": "devmetrics.startTracking",
+                    "when": "view == devmetrics.projectsView && viewItem == project-inactive",
+                    "group": "inline"
+                },
+                {
+                    "command": "devmetrics.stopTracking",
+                    "when": "view == devmetrics.projectsView && viewItem == project-active",
+                    "group": "inline"
+                },
+                {
+                    "command": "devmetrics.renameProject",
+                    "when": "view == devmetrics.projectsView && viewItem =~ /project/",
+                    "group": "1_modification"
+                },
+                {
+                    "command": "devmetrics.changeProjectFolder",
+                    "when": "view == devmetrics.projectsView && viewItem =~ /project/",
+                    "group": "1_modification"
+                },
+                {
+                    "command": "devmetrics.deleteProject",
+                    "when": "view == devmetrics.projectsView && viewItem =~ /project/",
+                    "group": "1_modification"
                 }
             ]
         }
