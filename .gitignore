@@ -5,3 +5,5 @@ node_modules
 *.vsix
 CONTEXT.md
 futurePlans.md
+package-lock.json
+pnpm-lock.yaml
