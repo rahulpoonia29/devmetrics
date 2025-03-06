@@ -63,7 +63,7 @@ export class MetricsDatabase {
                                 this.db.addCollection<Project & LokiObj>(
                                     'projects',
                                     {
-                                        unique: ['name', 'folder_path'],
+                                        unique: ['id', 'name', 'folder_path'],
                                         indices: [
                                             'name',
                                             'folder_path',
@@ -79,7 +79,7 @@ export class MetricsDatabase {
                                 this.db.addCollection<DbMetricsRecord>(
                                     'metrics_records',
                                     {
-                                        unique: ['id'],
+                                        unique: ['id', 'timestamp'],
                                         indices: ['project_name', 'timestamp'],
                                     }
                                 )
@@ -199,19 +199,26 @@ export class MetricsDatabase {
                 $or: [{ name: projectName }, { folder_path: folderPath }],
             })
 
-            if (existingProject) {
+            if (existingProject?.name === projectName) {
                 throw new DatabaseError(
-                    `Project with name ${projectName} or path ${folderPath} already exists`,
+                    `Project with name ${projectName} already exists`,
+                    'CREATE_FAILED'
+                )
+            }
+            if (existingProject?.folder_path === folderPath) {
+                throw new DatabaseError(
+                    `Project with folder path ${folderPath} already exists`,
                     'CREATE_FAILED'
                 )
             }
 
             // Create the project
             this.projects.insert({
+                id: uuidv4(),
                 name: projectName,
                 folder_path: folderPath,
                 is_tracking: false,
-                last_saved_time: -100,
+                last_saved_time: Date.now(),
             })
 
             await this.persistToDisk()
@@ -289,56 +296,6 @@ export class MetricsDatabase {
                 'UPDATE_FAILED'
             )
         }
-    }
-
-    public async deleteProject(projectName: string): Promise<void> {
-        this.checkInitialized()
-
-        try {
-            // Find all metrics records for this project
-            const metricsToDelete = this.metricsRecords.find({
-                project_name: projectName,
-            })
-
-            // For each metrics record, delete related data
-            for (const record of metricsToDelete) {
-                await this.deleteMetricsRecordCascade(record.id)
-            }
-
-            // Delete the project
-            this.projects.findAndRemove({ name: projectName })
-            await this.persistToDisk()
-        } catch (error) {
-            throw new DatabaseError(
-                `Failed to delete project: ${error instanceof Error ? error.message : String(error)}`,
-                'DELETE_FAILED'
-            )
-        }
-    }
-
-    private async deleteMetricsRecordCascade(recordId: string): Promise<void> {
-        // Find all file changes for this metrics record
-        const fileChangesToDelete = this.fileChanges.find({
-            metrics_record_id: recordId,
-        })
-
-        // For each file change, delete related line changes and chunk ranges
-        for (const fileChange of fileChangesToDelete) {
-            if (hasLokiId(fileChange)) {
-                this.lineChanges.findAndRemove({
-                    file_change_id: fileChange.$loki,
-                })
-                this.chunkRanges.findAndRemove({
-                    file_change_id: fileChange.$loki,
-                })
-            }
-        }
-
-        // Delete the file changes
-        this.fileChanges.findAndRemove({ metrics_record_id: recordId })
-
-        // Delete the metrics record
-        this.metricsRecords.findAndRemove({ id: recordId })
     }
 
     public async saveMetrics(
@@ -424,7 +381,6 @@ export class MetricsDatabase {
         }
     }
 
-    // !To be used in future probably
     public async loadMetrics(
         projectName: string,
         options?: MetricsQueryOptions
@@ -576,5 +532,136 @@ export class MetricsDatabase {
             console.error('Error getting metric summary:', error)
             return null
         }
+    }
+
+    public async renameProject(
+        oldName: string,
+        newName: string
+    ): Promise<void> {
+        this.checkInitialized()
+
+        try {
+            // Check if project already exists
+            const existingProject = this.projects.findOne({
+                name: newName,
+            })
+
+            if (existingProject) {
+                throw new DatabaseError(
+                    `Project with name ${newName} already exists`,
+                    'RENAME_FAILED'
+                )
+            }
+
+            // Update the project name
+            this.projects.findAndUpdate({ name: oldName }, (project) => {
+                project.name = newName
+            })
+
+            // Update project name in metrics records
+            this.metricsRecords.findAndUpdate(
+                { project_name: oldName },
+                (record) => {
+                    record.project_name = newName
+                }
+            )
+
+            await this.persistToDisk()
+        } catch (error) {
+            if (error instanceof DatabaseError) {
+                throw error
+            }
+
+            throw new DatabaseError(
+                `Failed to rename project: ${error instanceof Error ? error.message : String(error)}`,
+                'RENAME_FAILED'
+            )
+        }
+    }
+
+    public async changeProjectFolder(
+        projectName: string,
+        newFolderPath: string
+    ): Promise<void> {
+        try {
+            // Check if another project is already using this folder
+            const existingProject = this.projects.findOne({
+                name: { $ne: projectName },
+                folder_path: newFolderPath,
+            })
+
+            if (existingProject) {
+                throw new DatabaseError(
+                    `Folder is already used by project "${existingProject.name}"`,
+                    'FOLDER_IN_USE'
+                )
+            }
+
+            // Update project in database
+            this.projects.findAndUpdate({ name: projectName }, (project) => {
+                project.folder_path = newFolderPath
+            })
+
+            await this.persistToDisk()
+        } catch (error) {
+            if (error instanceof DatabaseError) {
+                throw error
+            }
+
+            throw new DatabaseError(
+                `Failed to update project folder: ${error instanceof Error ? error.message : String(error)}`,
+                'FOLDER_UPDATE_FAILED'
+            )
+        }
+    }
+
+    public async deleteProject(projectName: string): Promise<void> {
+        this.checkInitialized()
+
+        try {
+            // Find all metrics records for this project
+            const metricsToDelete = this.metricsRecords.find({
+                project_name: projectName,
+            })
+
+            // For each metrics record, delete related data
+            for (const record of metricsToDelete) {
+                await this.deleteMetricsRecordCascade(record.id)
+            }
+
+            // Delete the project
+            this.projects.findAndRemove({ name: projectName })
+            await this.persistToDisk()
+        } catch (error) {
+            throw new DatabaseError(
+                `Failed to delete project: ${error instanceof Error ? error.message : String(error)}`,
+                'DELETE_FAILED'
+            )
+        }
+    }
+
+    private async deleteMetricsRecordCascade(recordId: string): Promise<void> {
+        // Find all file changes for this metrics record
+        const fileChangesToDelete = this.fileChanges.find({
+            metrics_record_id: recordId,
+        })
+
+        // For each file change, delete related line changes and chunk ranges
+        for (const fileChange of fileChangesToDelete) {
+            if (hasLokiId(fileChange)) {
+                this.lineChanges.findAndRemove({
+                    file_change_id: fileChange.$loki,
+                })
+                this.chunkRanges.findAndRemove({
+                    file_change_id: fileChange.$loki,
+                })
+            }
+        }
+
+        // Delete the file changes
+        this.fileChanges.findAndRemove({ metrics_record_id: recordId })
+
+        // Delete the metrics record
+        this.metricsRecords.findAndRemove({ id: recordId })
     }
 }

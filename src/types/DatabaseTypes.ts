@@ -82,6 +82,7 @@ export interface MetricsStorageResult {
 }
 
 export interface Project {
+    id: string
     name: string
     folder_path: string
     is_tracking: boolean
