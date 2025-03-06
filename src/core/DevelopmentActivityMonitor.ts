@@ -4,6 +4,7 @@ import { GitError } from 'simple-git'
 import { ConfigurationTarget, window, workspace } from 'vscode'
 import { MetricsDatabase } from '../DB/MetricsDatabase'
 import { GitSnapshotManager } from '../services/git/GitSnapshotManager'
+import { Project } from '../types/DatabaseTypes'
 
 export class DevelopmentActivityMonitor {
     private readonly gitSnapshotManager: GitSnapshotManager
@@ -12,13 +13,12 @@ export class DevelopmentActivityMonitor {
     private readonly checkIntervalMs = 60000 // 1 minute
     constructor(
         private metricsDatabase: MetricsDatabase,
-        private projectName: string,
-        projectFolderPath: string,
+        private project: Project,
         globalStorageFolderPath: string
     ) {
         const projectHash = crypto
             .createHash('md5')
-            .update(projectFolderPath)
+            .update(project.id)
             .digest('hex')
 
         const trackedRepositoryFolder = path.join(
@@ -27,13 +27,17 @@ export class DevelopmentActivityMonitor {
             projectHash
         )
         this.gitSnapshotManager = new GitSnapshotManager(
-            projectFolderPath,
+            project.folder_path,
             trackedRepositoryFolder
         )
     }
 
     public async startTracking(): Promise<void> {
         try {
+            if (!this.project || !this.project.folder_path) {
+                throw new Error('Invalid project or project folder path')
+            }
+
             await this.gitSnapshotManager.initializeRepository()
             this.sessionStartTime = Date.now()
             this.beginChangeAnalysis()
@@ -52,7 +56,7 @@ export class DevelopmentActivityMonitor {
         this.analysisTimer = setInterval(async () => {
             // *Check if the project is still being tracked
             const project = await this.metricsDatabase.getProject(
-                this.projectName
+                this.project.name
             )
             if (!project) return
             if (!project.is_tracking) return
@@ -94,7 +98,7 @@ export class DevelopmentActivityMonitor {
                 return
             }
 
-            await this.metricsDatabase.saveMetrics(changes, this.projectName)
+            await this.metricsDatabase.saveMetrics(changes, this.project.name)
 
             window.showInformationMessage('Saved code change metrics.')
         } catch (error: unknown) {

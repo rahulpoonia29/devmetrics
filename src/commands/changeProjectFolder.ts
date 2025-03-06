@@ -42,10 +42,11 @@ export async function changeProjectFolder(
             return
         }
 
-        // Stop tracking
+        // Stop tracking and record the changes for the old folder
         const monitor = monitors.get(selected.project.name)
         if (monitor) {
             await monitor.stopTracking()
+            await monitor.recordChanges()
         }
         await db.updateProjectTrackingStatus(selected.project.name, false)
         monitors.delete(selected.project.name)
@@ -81,9 +82,7 @@ export async function changeProjectFolder(
 
     try {
         // Update project in database
-        await db.createProject(selected.project.name, newFolderPath)
-        await db.deleteProject(selected.project.name)
-        await db.createProject(selected.project.name, newFolderPath)
+        await db.changeProjectFolder(selected.project.name, newFolderPath)
 
         vscode.window.showInformationMessage(
             `Project "${selected.project.name}" folder updated to ${newFolderPath}`

@@ -22,8 +22,7 @@ export async function toggleProjectTracking(
             if (!monitor) {
                 monitor = new DevelopmentActivityMonitor(
                     db,
-                    projectName,
-                    project.folder_path,
+                    project,
                     globalStoragePath
                 )
                 monitors.set(projectName, monitor)

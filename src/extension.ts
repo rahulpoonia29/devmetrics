@@ -21,8 +21,7 @@ export async function activate(context: vscode.ExtensionContext) {
         const development_activity_monitor_instance =
             new DevelopmentActivityMonitor(
                 DB,
-                project.name,
-                project.folder_path,
+                project,
                 context.globalStorageUri.fsPath
             )
 

@@ -6,7 +6,9 @@ export async function renameProject(db: MetricsDatabase): Promise<void> {
     const projects = await db.getAllProjects()
 
     if (projects.length === 0) {
-        vscode.window.showInformationMessage('No projects available to rename.')
+        vscode.window.showInformationMessage(
+            'No projects available to rename. Please create a project first.'
+        )
         return
     }
 
@@ -52,14 +54,7 @@ export async function renameProject(db: MetricsDatabase): Promise<void> {
     }
 
     try {
-        // First create a new project with the new name
-        await db.createProject(newName, selected.project.folder_path)
-
-        // Copy metrics from old project to new project (implementation needed)
-        // This would require creating a method in the MetricsDatabase to copy metrics
-
-        // Delete the old project
-        await db.deleteProject(selected.project.name)
+        await db.renameProject(selected.project.name, newName)
 
         vscode.window.showInformationMessage(
             `Project renamed from "${selected.project.name}" to "${newName}"`

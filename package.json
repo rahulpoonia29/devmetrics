@@ -27,26 +27,24 @@
                 "icon": "$(add)"
             },
             {
+                "command": "devmetrics.renameProject",
+                "title": "DevMetrics: Rename Project",
+                "icon": "$(pencil)"
+            },
+            {
                 "command": "devmetrics.deleteProject",
                 "title": "DevMetrics: Delete Project",
                 "icon": "$(trashcan)"
             },
             {
-                "command": "devmetrics.manageProjects",
-                "title": "DevMetrics: Manage Projects"
-            },
-            {
-                "command": "devmetrics.renameProject",
-                "title": "DevMetrics: Rename Project"
-            },
-            {
                 "command": "devmetrics.changeProjectFolder",
-                "title": "DevMetrics: Change Project Folder"
+                "title": "DevMetrics: Change Project Folder",
+                "icon": "$(file-directory)"
             },
             {
-                "command": "devmetrics.viewProjectMetrics",
-                "title": "DevMetrics: View Project Metrics",
-                "icon": "$(graph-line)"
+                "command": "devmetrics.manageProjects",
+                "title": "DevMetrics: Manage Projects",
+                "icon": "$(list-unordered)"
             },
             {
                 "command": "devmetrics.startTracking",
@@ -57,6 +55,11 @@
                 "command": "devmetrics.stopTracking",
                 "title": "DevMetrics: Stop Tracking",
                 "icon": "$(stop)"
+            },
+            {
+                "command": "devmetrics.viewProjectMetrics",
+                "title": "DevMetrics: View Project Metrics",
+                "icon": "$(graph-line)"
             },
             {
                 "command": "devmetrics.refreshData",
@@ -104,8 +107,7 @@
                 {
                     "id": "devmetrics.metricsView",
                     "name": "Project Metrics",
-                    "type": "tree",
-                    "when": "config.devmetrics.showMetricsView == true"
+                    "type": "tree"
                 }
             ]
         },
@@ -182,6 +184,7 @@
     "devDependencies": {
         "@types/fs-extra": "^11.0.4",
         "@types/lokijs": "^1.5.14",
+        "@types/mocha": "^10.0.10",
         "@types/node": "22.x",
         "@types/uuid": "^10.0.0",
         "@types/vscode": "^1.97.0",

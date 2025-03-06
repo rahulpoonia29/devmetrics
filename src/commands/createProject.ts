@@ -33,12 +33,11 @@ export async function createProject(
         await vscode.window.showInformationMessage(
             `A project already exists for this folder: ${existingProject.name}`
         )
-
         return
     }
 
     // Ask user for project name
-    let projectName = await vscode.window.showInputBox({
+    const projectName = await vscode.window.showInputBox({
         prompt: 'Enter a name for this project',
         value: folderName,
         validateInput: (value) => {

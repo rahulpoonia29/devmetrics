@@ -15,6 +15,7 @@ export async function registerCommands(
     monitors: Map<string, DevelopmentActivityMonitor>,
     globalStoragePath: string
 ): Promise<vscode.Disposable[]> {
+    // 1. Create project command
     const createProjectCmd = vscode.commands.registerCommand(
         'devmetrics.createProject',
         () =>
@@ -23,6 +24,16 @@ export async function registerCommands(
             })
     )
 
+    // 2. Rename project command
+    const renameProjectCmd = vscode.commands.registerCommand(
+        'devmetrics.renameProject',
+        () =>
+            renameProject(db).then(() => {
+                vscode.commands.executeCommand('devmetrics.refreshData')
+            })
+    )
+
+    // 3. Delete project command
     const deleteProjectCmd = vscode.commands.registerCommand(
         'devmetrics.deleteProject',
         async (treeItem?: ProjectTreeItem) => {
@@ -71,22 +82,7 @@ export async function registerCommands(
         }
     )
 
-    const manageProjectsCmd = vscode.commands.registerCommand(
-        'devmetrics.manageProjects',
-        () =>
-            manageProjects(db, monitors, globalStoragePath).then(() => {
-                vscode.commands.executeCommand('devmetrics.refreshData')
-            })
-    )
-
-    const renameProjectCmd = vscode.commands.registerCommand(
-        'devmetrics.renameProject',
-        () =>
-            renameProject(db).then(() => {
-                vscode.commands.executeCommand('devmetrics.refreshData')
-            })
-    )
-
+    // 4. Change project folder command
     const changeProjectFolderCmd = vscode.commands.registerCommand(
         'devmetrics.changeProjectFolder',
         () =>
@@ -95,6 +91,16 @@ export async function registerCommands(
             })
     )
 
+    // 5. Manage projects command
+    const manageProjectsCmd = vscode.commands.registerCommand(
+        'devmetrics.manageProjects',
+        () =>
+            manageProjects(db, monitors, globalStoragePath).then(() => {
+                vscode.commands.executeCommand('devmetrics.refreshData')
+            })
+    )
+
+    // 6. Start tracking command
     const startTrackingCmd = vscode.commands.registerCommand(
         'devmetrics.startTracking',
         async (treeItem?: ProjectTreeItem) => {
@@ -155,6 +161,7 @@ export async function registerCommands(
         }
     )
 
+    // 7. Stop tracking command
     const stopTrackingCmd = vscode.commands.registerCommand(
         'devmetrics.stopTracking',
         async (treeItem?: ProjectTreeItem) => {
@@ -215,6 +222,7 @@ export async function registerCommands(
         }
     )
 
+    // 8. View project metrics command
     const viewProjectMetricsCmd = vscode.commands.registerCommand(
         'devmetrics.viewProjectMetrics',
         async (treeItem?: any) => {
